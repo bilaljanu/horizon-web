@@ -1,0 +1,888 @@
+From 275857cc2e457ebbc5f25a588332e5d74544a3c3 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Thu, 12 Nov 2026 15:34:37 +0100
+Subject: [PATCH] Add Chromebook IWA packaging and remove default server
+ promotion
+
+Co-Authored-By: Codex <codex@openai.com>
+---
+ .github/workflows/chromebook-web.yml     |  45 +++++
+ README.md                                | 210 +++++------------------
+ crates/horizon-client/src/game.rs        |   2 +-
+ crates/horizon-client/src/multiplayer.rs |   8 -
+ crates/horizon-os/src/net.rs             |   4 +-
+ crates/horizon-os/src/workers.rs         |  10 +-
+ web/README.md                            |   4 +-
+ web/iwa/.gitignore                       |   3 +
+ web/iwa/README.md                        |  83 +++++++++
+ web/iwa/icon.svg                         |   4 +
+ web/iwa/package-lock.json                | 151 ++++++++++++++++
+ web/iwa/package.json                     |   8 +
+ web/iwa/package.mjs                      |  86 ++++++++++
+ web/iwa/test.mjs                         |  63 +++++++
+ web/main.js                              |   5 +
+ 15 files changed, 509 insertions(+), 177 deletions(-)
+ create mode 100644 .github/workflows/chromebook-web.yml
+ create mode 100644 web/iwa/.gitignore
+ create mode 100644 web/iwa/README.md
+ create mode 100644 web/iwa/icon.svg
+ create mode 100644 web/iwa/package-lock.json
+ create mode 100644 web/iwa/package.json
+ create mode 100644 web/iwa/package.mjs
+ create mode 100644 web/iwa/test.mjs
+
+diff --git a/.github/workflows/chromebook-web.yml b/.github/workflows/chromebook-web.yml
+new file mode 100644
+index 0000000..ce8ebd1
+--- /dev/null
++++ b/.github/workflows/chromebook-web.yml
+@@ -0,0 +1,45 @@
++name: Chromebook web build
++on:
++  push:
++    paths: ['web/**', '.github/workflows/chromebook-web.yml', 'crates/horizon-os/src/**']
++  pull_request:
++    paths: ['web/**', '.github/workflows/chromebook-web.yml', 'crates/horizon-os/src/**']
++  workflow_dispatch:
++    inputs:
++      compile_wasm:
++        description: Compile the engine without private game resources
++        type: boolean
++        default: false
++permissions:
++  contents: read
++jobs:
++  packaging:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-node@v4
++        with:
++          node-version: '22'
++          cache: npm
++          cache-dependency-path: web/iwa/package-lock.json
++      - run: npm ci --prefix web/iwa
++      - run: npm test --prefix web/iwa
++  wasm:
++    if: github.event_name == 'workflow_dispatch' && inputs.compile_wasm
++    runs-on: ubuntu-latest
++    timeout-minutes: 90
++    steps:
++      - uses: actions/checkout@v4
++      - name: Install build tools
++        run: |
++          rustup toolchain install nightly-2026-10-14 --profile minimal --component rust-src
++          rustup target add wasm32-unknown-unknown --toolchain nightly-2026-10-14
++          cargo install wasm-bindgen-cli --version 0.2.129 --locked
++      - name: Compile without Minecraft resources
++        run: PROFILE=fast BUNDLE=0 web/build.sh
++      - uses: actions/upload-artifact@v4
++        with:
++          name: horizon-web-engine-needs-local-resources
++          path: web/dist/
++          if-no-files-found: error
++          retention-days: 7
+diff --git a/README.md b/README.md
+index 00c706d..cfac87a 100644
+--- a/README.md
++++ b/README.md
+@@ -1,183 +1,65 @@
+-<p align="center">
+-  <img src="docs/media/banner.webp" alt="Horizon: the game you know, rebuilt in Rust" width="100%">
+-</p>
++# Horizon Web for Chromebook
+ 
+-<p align="center">
+-  <a href="https://playhorizon.dev"><b>Website</b></a> ·
+-  <a href="#download"><b>Download</b></a> ·
+-  <a href="https://playhorizon.dev/docs/"><b>Docs</b></a> ·
+-  <a href="https://discord.gg/playhorizon"><b>Discord</b></a> ·
+-  <a href="ROADMAP.md"><b>Roadmap</b></a> ·
+-  <a href="#contributing"><b>Contributing</b></a>
+-</p>
++An experimental Minecraft Java Edition 26.3 client in the browser, built from
++[Horizon Web](https://github.com/nobuildersnotools/horizon-web) and
++[Horizon](https://github.com/horizon-rust/horizon). Rust → WebAssembly → WebGPU.
+ 
+-<p align="center">
+-  <img src="https://img.shields.io/badge/vanilla%20parity-100%25-F0795A" alt="Vanilla parity 100%">
+-  <a href="#project-status"><img src="https://img.shields.io/badge/player--visible%20gaps-0%20open-F0795A" alt="Player-visible gaps open"></a>
+-</p>
++This fork focuses on a simple Chromebook setup and an installable **Isolated Web
++App (IWA)**. There are no default promoted multiplayer servers.
+ 
+-# Horizon
++## Start here
+ 
+-**Minecraft: Java Edition 26.3, rewritten in Rust.** Your worlds, the same rules and the same terrain as the Java game, checked against it by hundreds of differential tests, in one native program with no Java. Free, open source (MIT) and unofficial: you play it with your own copy of Java Edition.
++| I want to… | Go here |
++| --- | --- |
++| Build and install the Chromebook app | [Chromebook guide](web/iwa/README.md) |
++| Build a normal browser version | [Web build guide](web/README.md#build-and-run) |
++| Understand the browser port's limits | [Known web limitations](web/README.md#whats-missing) |
++| Work on the engine | [Architecture](docs/architecture.md) |
+ 
+-> **This is a fork with a browser port.** It is based on [horizon-rust/horizon](https://github.com/horizon-rust/horizon) and adds an experimental build of the client for the web: WebAssembly drawing through WebGPU, with threads as Web Workers. Everything else below is upstream's README. The port is described in [Horizon in the browser](#horizon-in-the-browser), and the badges, release links and launcher downloads point at upstream.
++**Status:** IWA packaging and compatibility changes are experimental. Packaging
++checks use fixtures; a complete game launch inside ChromeOS still needs testing.
++No playable download is included. Building needs resources prepared from your
++own Minecraft installation; do not commit or publicly upload those resources.
+ 
+-<p align="center">
+-  <img src="docs/media/readme/valley.webp" alt="A river valley with a plains village, savanna hills and a cherry grove, seen from above with a long view distance" width="100%">
+-</p>
++The browser port supports single player, local saves, audio, controllers and
++compatible WebSocket multiplayer. It requires WebGPU and shared-memory support.
++Java Fabric/NeoForge mods do not run in this Rust client. Packaging as an IWA does
++not add Java mod support, Microsoft sign-in or direct TCP networking.
+ 
+-## What works today
++## Build the game
+ 
+-Everything below is in the current release.
+-
+-- **The game.** Survival, creative, hardcore and spectator; vanilla world generation in all three dimensions, mobs, villagers, raids, redstone, every command, the HUD and the recipe book. Vanilla saves open as they are, and worlds from 1.8 to 26.2 are upgraded.
+-- **Multiplayer.** Join vanilla and Horizon servers (online mode included), open a world to LAN, or invite friends with a code from the launcher's Home page.
+-- **Graphics.** Distant terrain up to 1,024 chunks, graphics presets, HDR and controllers, all off by default where they would change the vanilla look ([settings](https://playhorizon.dev/docs/settings)).
+-- **Packs.** Resource packs, data packs and shader packs ([below](#mods-and-shader-packs)).
+-- **Mods.** Content mods and native Rust mods, installed from the launcher ([below](#mods-and-shader-packs)).
+-- **Servers.** Host one from the launcher, or run `horizon-server` on a VPS ([below](#host-a-server)).
+-- **The launcher.** It installs and updates the game, prepares its files from your copy of Minecraft, and updates itself.
+-
+-<table>
+-  <tr>
+-    <td width="50%"><img src="docs/media/readme/sunset.webp" alt="Sunset behind a cherry grove on a hill, with a river below"></td>
+-    <td width="50%"><img src="docs/media/readme/nether.webp" alt="A crimson forest in the Nether, with a piglin among the fungi"></td>
+-  </tr>
+-  <tr>
+-    <td width="50%"><img src="docs/media/readme/survival.webp" alt="Survival in a village square: two villagers, flowers, the hotbar, health and hunger"></td>
+-    <td width="50%"><img src="docs/media/readme/multiplayer.webp" alt="Two players in a LAN world: the other player's name tag and the player list"></td>
+-  </tr>
+-</table>
+-
+-<sub>Nightly 2026-11-05 on a Mac mini (Apple M4 Pro, Metal): vanilla's textures, no mods or shader packs, render distance 32 with distant terrain on.</sub>
+-
+-## Performance
+-
+-**Horizon draws more frames per second than Java Edition, and loads faster, on the same machine, world and path.** `tools/perf_bench.py` runs each game in turn, from a fresh world (seed 1234), waiting for the terrain and then flying it over a village, a forest, an ocean and a mountain. Measured on 2026-10-29/30 on an idle Windows 11 machine (Ryzen 7 9800X3D, RTX 5080), Horizon v0.2.97 as the launcher installs it, 1280x720 in a window, VSync off, three games per figure. Frames per second, mean of the four scenes, with the slowest 1% of frames in brackets:
+-
+-| Render distance | Horizon v0.2.97 | Vanilla 26.3 | Vanilla + mods |
+-| --- | --- | --- | --- |
+-| 8 chunks | 3,289 (1,327) | 2,437 (640) | 2,375 (709) |
+-| 16 chunks | 2,074 (598) | 1,661 (375) | 1,586 (432) |
+-| 32 chunks | 1,207 (333) | 1,031 (176) | 879 (264) |
+-
+-"Vanilla + mods" is Sodium, Lithium, FerriteCore and ImmediatelyFast. Horizon reaches the title screen in 2.9–3.2 s against vanilla's 7.5–7.7 s (the modded client's 10.8–11.1 s), loads a scene's chunks 2.9–3.8 times faster, and playing holds a steady working set of 1.1–1.7 GB against 1.9–2.9 GB. Every scene with its confidence interval and the run's load log: [the 2026-10-29 reports](benchmarks/perf/windows-9800x3d-5080-2026-10-29.md). Method, and how to measure your own machine: [docs/benchmark.md](docs/benchmark.md). [playhorizon.dev/benchmarks](https://playhorizon.dev/benchmarks) puts these runs beside a 2016 laptop, a Mac mini and a gaming desktop.
+-
+-## Download
+-
+-Get **the Horizon launcher** from [playhorizon.dev](https://playhorizon.dev), or from [the launcher releases](https://github.com/horizon-rust/horizon/releases?q=launcher&expanded=true):
+-
+-| Platform | File | Needs |
+-| --- | --- | --- |
+-| Windows x64 | `horizon-launcher-setup.exe` | Windows 10 or 11, a GPU with Vulkan or DirectX 12 |
+-| Windows on Arm | `horizon-launcher-setup-arm64.exe` | Windows 11 on Arm |
+-| macOS, Apple Silicon | `horizon-launcher-macos-arm64.dmg` | macOS 12 or later |
+-| macOS, Intel | `horizon-launcher-macos-x64.dmg` | macOS 12 or later |
+-| Linux x86-64 | `horizon-launcher-linux-x86_64.AppImage` or `.tar.gz` | a glibc distribution, X11 or Wayland, a GPU with Vulkan or OpenGL 3.3 |
+-
+-**You also need a Microsoft account that owns Minecraft: Java Edition.** You sign in with it in the launcher, which plays only with an account that owns the game ([why](docs/microsoft-account.md)). Horizon contains no Minecraft code or assets: an existing install (official launcher, Prism, MultiMC...) is reused, and without one the launcher downloads 26.3 from Mojang for your account. Step by step: [Install and first launch](https://playhorizon.dev/docs/install).
+-
+-<table>
+-  <tr>
+-    <td width="50%"><img src="docs/media/readme/launcher-home.webp" alt="The launcher's Home page: the Horizon instance, Play, the version picker, the friend invite field, screenshots and the patch log"></td>
+-    <td width="50%"><img src="docs/media/readme/launcher-mods.webp" alt="The launcher's Mods page: Horizon's mod registry with Zoom selected, and tabs for modpacks, resource packs, shader packs and data packs"></td>
+-  </tr>
+-</table>
+-
+-## Mods and shader packs
+-
+-- **Content mods** (`.hmod`): blocks, items, recipes, loot, models and textures, with no code.
+-- **Native mods** (`.hnmod`): Rust that the launcher compiles into the game for you, with nothing to install.
+-- **Java mods** (Fabric, NeoForge, Forge) don't run: Horizon has no Java. The launcher carries over the data and assets inside their jars, and imports modpacks (`.mrpack`, CurseForge zips, Prism instances) the same way ([modpacks](https://playhorizon.dev/docs/modpacks)).
+-- **Shader packs**: Iris/OptiFine-format packs (`shaders/` folders) and Horizon's own WGSL packs, under Video Settings → Shader Packs ([pack format](docs/shaders.md)).
+-
+-Mods are off by default: a fresh install plays exactly like vanilla 26.3. The launcher's Mods page browses Horizon's registry and Modrinth. [Mods](https://playhorizon.dev/docs/mods) · [make a mod](docs/mods.md).
+-
+-## Horizon in the browser
+-
+-The `web` branch compiles the client for `wasm32-unknown-unknown` and runs it in a WebGPU-capable browser (Chrome and Edge have it). It reaches the title screen, opens single-player worlds, joins offline-mode Horizon and Eaglercraft-compatible servers over a WebSocket, and plays sound. It is experimental, and like the native game it needs resources prepared from your own copy of Minecraft, which are never published: build it yourself rather than expecting a hosted demo. Build steps, design and what's missing: [web/README.md](web/README.md).
++On a Linux build machine (or Chromebook Linux environment), install Rust,
++Python 3.10+, JDK 25 and the dependencies in the [web guide](web/README.md).
++Prepare resources from your own Minecraft Java Edition 26.3 installation:
+ 
+ ```sh
++cargo run --release -p horizon-prepare -- --prepare --server-jar /path/to/server.jar
++cargo run --release -p horizon-prepare -- sounds
+ web/build.sh
+-python3 web/serve.py   # http://localhost:8080
+ ```
+ 
+-## Host a server
+-
+-The launcher's **Servers** page creates, starts, backs up and updates a server, and invites friends. On a VPS, `horizon-server` installs with one command, needs no Java, and takes vanilla 26.3 and Horizon players alike. [Host a server](https://playhorizon.dev/docs/hosting) ([reference](docs/hosting.md)).
+-
+-## Agent control
+-
+-AI agents and scripts can play Horizon. `horizon-ctl`, shipped with the game, reads its state as JSON and acts like a player; `horizon-ctl mcp` serves the same commands over MCP.
+-
+-```sh
+-horizon-ctl launch --world Survival --seed 5 --wait   # finds the version the launcher installed
+-horizon-ctl state                                       # position, health, food, target, screen...
+-horizon-ctl goto -0.5 65 -2.5 --near 2.5                # walks there along a path
+-horizon-ctl break -1 65 -3                              # mines it; replies with the drops
+-```
+-
+-`horizon-ctl help` lists every command. [Agent control](docs/native-client.md#agent-control-horizon-ctl-and-mcp).
+-
+-## Build from source
+-
+-Needs Rust 1.90+, Python 3.10+, JDK 25, and on Linux `libasound2-dev libudev-dev`. `horizon-prepare` builds the game's resources from **your own copy** of Java Edition 26.3 (checked against `research-lock.json`) and never downloads it:
+-
+-1. **Client:** play 26.3 once in the official launcher. Horizon reads `~/.minecraft` (or `--minecraft-dir` / `HORIZON_MINECRAFT_DIR`).
+-2. **Server jar:** the 26.3 server jar (`downloads.server.url` in `versions/26.3/26.3.json`), passed once with `--server-jar` or `HORIZON_SERVER_JAR`.
+-
+-```sh
+-git clone https://github.com/horizon-rust/horizon.git
+-cd horizon
+-cargo run --release -p horizon-prepare -- --prepare --server-jar ~/Downloads/server.jar   # needs JDK 25
+-cargo run --release -p horizon-prepare -- sounds   # optional: sounds from your launcher install
+-cargo run --release -p horizon-client
+-```
+-
+-Prepared files land in the gitignored `.local/`: never commit or share them. Options, controls and architecture: [the native client guide](docs/native-client.md); all developer docs: [docs/README.md](docs/README.md).
+-
+-## Contributing
+-
+-Issues and pull requests are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) (vanilla first, small pull requests), and see [ROADMAP.md](ROADMAP.md) or [playhorizon.dev/hub](https://playhorizon.dev/hub) for what's next. Questions: [Discord](https://discord.gg/playhorizon). Before a pull request, run the self-check and paste its output:
+-
+-```sh
+-git config core.hooksPath .githooks
+-python3 tools/pr_ready.py
+-```
+-
+-It runs rustfmt, clippy, the touched crates' tests, the Python tests, the public-tree check and the vanilla harnesses your change affects. Never commit game files, decompiled source or prepared resources.
+-
+-## Project status
+-
+-**Player-visible gaps: 0 open** of the 833 the [port ledger](tools/port_ledger.py) found, reading every vanilla 26.3 method against Horizon's code: vanilla behaviour a player would notice that Horizon doesn't have yet. By area: Animals [0](https://github.com/horizon-rust/horizon/issues/3512); Monsters and bosses [0](https://github.com/horizon-rust/horizon/issues/3513); Entities, projectiles, vehicles and decorations [0](https://github.com/horizon-rust/horizon/issues/3514); Items, enchantments and inventories [0](https://github.com/horizon-rust/horizon/issues/3515); Blocks, redstone and fluids [0](https://github.com/horizon-rust/horizon/issues/3516); World, world generation and saves [0](https://github.com/horizon-rust/horizon/issues/3517); Screens, HUD and client packets [0](https://github.com/horizon-rust/horizon/issues/3518); Entity and block rendering, models [0](https://github.com/horizon-rust/horizon/issues/3519); Server and players on the server [0](https://github.com/horizon-rust/horizon/issues/3520); Mob AI, villagers and raids [0](https://github.com/horizon-rust/horizon/issues/3521). This number goes down as gaps close (`tools/parity_gaps.py`); the harness results below say that what is tested matches.
+-
+-The table is the project's own audit: every subsystem matches vanilla in every harness that compares it. 100% means 100% of what the harnesses compare, not that nothing else differs. What players still run into: [known issues](docs/known-issues.md).
+-
+-### Java parity: 100%
++The preparer looks in `~/.minecraft`; use `--minecraft-dir` or
++`HORIZON_MINECRAFT_DIR` for another installation. The result is `web/dist/`.
++Continue with the [IWA packaging steps](web/iwa/README.md#package-the-app).
+ 
+-Scores: 0 (absent), 0.25 (started), 0.5 (playable, major features missing), 0.75 (mostly complete) or 1 (complete and verified by differential tests); the percentage is their average. Last audited 2026-10-13: the harnesses pass on Linux and macOS. The [port ledger](tools/port_ledger.py) adds a method-by-method view of what is ported.
++## Repository map
+ 
+-| Subsystem | Score | Main gaps |
+-| --- | ---: | --- |
+-| Window, input and game loop | 1 | None: game loop, options, camera, auto-jump, toggle sprint/sneak and frame limiter match |
+-| Assets and resources | 1 | None: item models match over 196,290 stacks; the resource pack screen over 3,000 sessions |
+-| Network protocol and multiplayer | 1 | None: joins vanilla servers; the dedicated server matches vanilla's files, login, configuration, play and command tree; LAN discovery over 462 cases (offline mode only) |
+-| Chunk storage and palettes | 1 | None: client and saves share paletted containers, identical to vanilla over 266 scenarios |
+-| Section meshing | 1 | None: 112 scenes and over a million quads identical to vanilla |
+-| Rendering | 1 | None: entity models, block entity renderers (407 cases) and animations (296), HUD overlays (2,200 states), the recipe book (600), player list, subtitles and world border match |
+-| Lighting | 1 | None: saved and relit light matches vanilla, slabs and stairs included |
+-| World generation | 1 | None: 2,352 whole chunks over 225 structure sites, in all three dimensions, identical to vanilla |
+-| Region files and saves | 1 | None: saves round-trip with vanilla; worlds from 1.8 to 26.2 upgrade as vanilla's DataFixers do |
+-| Entities and physics | 1 | None: attributes, spawn rules, natural spawning (15,500 cases), raids and patrols (1,900), `finalizeSpawn` (24,000) and mob AI (92 scenarios) match |
+-| Interaction and inventory | 1 | None: menu clicks over 8,000 sequences; recipe book placement (6,000), buttons (1,200), saved book (1,500), loom and crafter screens (1,600) |
+-| Menus, HUD and chat | 1 | None: every command (758 over 39,685 inputs), scoreboards (81,000 operations), the player list (872,000 draw calls), chat and its suggestions (3,000 sessions) match |
+-| Audio | 1 | None: the sound engine, sound events, music, situational music, ambience and subtitles match vanilla |
+-| Block behaviours and ticking | 1 | None: block updates, random ticks, redstone, dispensers (6,000 cases), crafters (4,000), container spills (4,000), copper golems and the sculk family (435 scenarios) match |
++- `web/` — browser loader, resource packaging and development server.
++- `web/iwa/` — Chromebook packaging, tests and installation guide.
++- `crates/` — Rust game engine and platform support.
++- `docs/`, `tests/`, `tools/` — engine documentation and developer checks.
++- `launcher/` — upstream native launcher, not needed to install the IWA.
+ 
+-## Licence
++The engine layout is retained so upstream fixes remain easier to merge.
++GitHub Actions → **Chromebook web build** checks packaging and can compile a
++resource-free Wasm artifact on manual runs. It does not publish Minecraft assets
++or create a playable signed app without your local resources.
+ 
+-[MIT](LICENSE), for the project's original work; dependencies keep their own licences ([notices](THIRD_PARTY_NOTICES.md)). Horizon is made by [Ludovic Marie](https://lu4ovic.com) ([@ludovic111](https://github.com/ludovic111)) and [its contributors](https://github.com/horizon-rust/horizon/graphs/contributors); support it on [GitHub Sponsors](https://github.com/sponsors/ludovic111).
++## Credits and licence
+ 
+-NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. Minecraft is a trademark of Mojang Synergies AB; its code and assets belong to Mojang and Microsoft under the [Minecraft EULA](https://www.minecraft.net/en-us/eula).
++Original Horizon by Ludovic Marie and contributors; browser port by
++[@bedrock3359](https://github.com/bedrock3359). Fork maintained by
++[@bilaljanu](https://github.com/bilaljanu).
++[MIT licence](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md).
+ 
+-The browser port is by [@bedrock3359](https://github.com/bedrock3359).
++Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
+diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
+index 1e9e71e..0c74a5e 100644
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -18485,7 +18485,7 @@ pub fn run_with() -> Result<()> {
+     if !options.offscreen && !synchronous_startup(&options) {
+         #[cfg(feature = "heartbeat")]
+         horizon_client::heartbeat::start();
+-        // The web build pins its own featured server instead (`multiplayer::FEATURED_SERVER`).
++        // The web build starts without promoted servers.
+         #[cfg(not(target_arch = "wasm32"))]
+         {
+             let player_dir = horizon_client::logging::player_dir();
+diff --git a/crates/horizon-client/src/multiplayer.rs b/crates/horizon-client/src/multiplayer.rs
+index 5e0a524..164a49d 100644
+--- a/crates/horizon-client/src/multiplayer.rs
++++ b/crates/horizon-client/src/multiplayer.rs
+@@ -438,11 +438,6 @@ pub fn add_official_server(game_dir: &Path) -> std::io::Result<()> {
+     horizon_os::fs::write(marker, format!("{address}\n"))
+ }
+ 
+-/// The web build's featured server, in place of the official one (browsers reach servers only
+-/// over a WebSocket): always first in the list, and the player can't edit, move or delete it.
+-#[cfg(target_arch = "wasm32")]
+-pub const FEATURED_SERVER: (&str, &str) = ("Carrotcraft", "wss://eagler.carrot-craft.org");
+-
+ /// Draws a featured row's label after its name at `(x, y)`, its row index given.
+ pub type FeaturedLabel = dyn Fn(&mut HudBatch, &HudAtlas, usize, f32, f32);
+ 
+@@ -464,9 +459,6 @@ fn featured() -> Vec<(String, String)> {
+     let set = FEATURED.with(|f| f.borrow().as_ref().map(|f| f.0.clone()));
+     let list = match set {
+         Some(list) => list,
+-        #[cfg(target_arch = "wasm32")]
+-        None => vec![(FEATURED_SERVER.0.to_owned(), FEATURED_SERVER.1.to_owned())],
+-        #[cfg(not(target_arch = "wasm32"))]
+         None => Vec::new(),
+     };
+     list.into_iter()
+diff --git a/crates/horizon-os/src/net.rs b/crates/horizon-os/src/net.rs
+index e97aa3a..8fa3a80 100644
+--- a/crates/horizon-os/src/net.rs
++++ b/crates/horizon-os/src/net.rs
+@@ -35,7 +35,7 @@ let onEvent = null, take = null, onListen = null;
+ function open(id, url, host, port, code, relays) {
+     if (code) return joinShared(id, code, relays);
+     if (!url) {
+-        const scheme = location.protocol === "https:" ? "wss" : "ws";
++        const scheme = ["https:", "isolated-app:"].includes(location.protocol) ? "wss" : "ws";
+         const name = host.includes(":") ? `[${host}]` : host;
+         url = `${scheme}://${name}:${port}/`;
+     }
+@@ -338,7 +338,7 @@ export function horizon_socket_install(events, taker, listening) {
+ // A worker's blocking GET (workers may make synchronous requests): the body
+ // of a 2xx answer, or null. An https page asks for https.
+ export function horizon_http_get(url) {
+-    if (location.protocol === "https:") url = url.replace(/^http:/, "https:");
++    if (["https:", "isolated-app:"].includes(location.protocol)) url = url.replace(/^http:/, "https:");
+     try {
+         const xhr = new XMLHttpRequest();
+         xhr.open("GET", url, false);
+diff --git a/crates/horizon-os/src/workers.rs b/crates/horizon-os/src/workers.rs
+index d2ec65b..41bf472 100644
+--- a/crates/horizon-os/src/workers.rs
++++ b/crates/horizon-os/src/workers.rs
+@@ -22,8 +22,16 @@ pub use std::thread::Result;
+ 
+ #[wasm_bindgen(inline_js = r#"
+ let pageModule, pageMemory;
++// IWA Trusted Types permits only this bundled worker, never an arbitrary URL.
++const workerURL = new URL("worker.js", location.href).href;
++const workerPolicy = globalThis.trustedTypes?.createPolicy("horizon-worker", {
++    createScriptURL(value) {
++        if (value !== workerURL) throw new TypeError("Unexpected worker URL");
++        return value;
++    },
++});
+ function start(ptr, name, stack) {
+-    const worker = new Worker(new URL("worker.js", location.href), { type: "module", name });
++    const worker = new Worker(workerPolicy ? workerPolicy.createScriptURL(workerURL) : workerURL, { type: "module", name });
+     // A thread this worker starts: the page starts it. Its sockets live on
+     // the page too (net.rs).
+     worker.onmessage = ({ data }) =>
+diff --git a/web/README.md b/web/README.md
+index 7aaee1e..4256ccd 100644
+--- a/web/README.md
++++ b/web/README.md
+@@ -1,5 +1,7 @@
+ # Horizon in the browser
+ 
++For the Chromebook app, see [IWA build and installation](iwa/README.md).
++
+ An experimental build of the Horizon client for the web: the same game code
+ compiled to WebAssembly, drawing through the browser's WebGPU. It creates and
+ opens single-player worlds, joins offline-mode Horizon and Eaglercraft
+@@ -189,7 +191,7 @@ world `Test` in creative mode at start.
+   login, redirect, error) becomes the login disconnect, so the client shows
+   the reason. The server list's status is the plugin's `Accept: motd` text
+   query, turned into a vanilla status. Checked against
+-  `wss://eagler.carrot-craft.org` (EaglercraftXServer 1.1.1 on Velocity):
++  an EaglercraftXServer 1.1.1 instance on Velocity:
+   login, configuration, play and keep-alives.
+ - **Profile** (`horizon-client/src/profile.rs`, `title/profile_screen.rs`):
+   the name is the offline name's line in `horizon-player.txt`, so every join
+diff --git a/web/iwa/.gitignore b/web/iwa/.gitignore
+new file mode 100644
+index 0000000..6982eb4
+--- /dev/null
++++ b/web/iwa/.gitignore
+@@ -0,0 +1,3 @@
++node_modules/
++*.pem
++*.swbn
+diff --git a/web/iwa/README.md b/web/iwa/README.md
+new file mode 100644
+index 0000000..532d877
+--- /dev/null
++++ b/web/iwa/README.md
+@@ -0,0 +1,83 @@
++# Chromebook app
++
++Build the game on Linux, then install the signed `.swbn` in Chrome on your
++Chromebook. You need a WebGPU-capable Chromebook and permission to enable IWA
++development mode. A school-managed device may restrict this; its administrator
++controls installation. This is Chrome's **IWA development flag**, not ChromeOS
++Developer Mode or a requirement to disable OS verification.
++
++## Package the app
++
++First follow the [root build steps](../../README.md#build-the-game). Install
++Node.js 22.13 or newer, then run these commands from the repository root:
++
++```sh
++npm ci --prefix web/iwa
++python3 web/package.py --no-build
++mkdir -p "$HOME/.config/horizon-iwa"
++# Run key generation ONCE. Reuse this key for later app updates.
++(umask 077; openssl genpkey -algorithm Ed25519 -out "$HOME/.config/horizon-iwa/signing.pem")
++node web/iwa/package.mjs web/out/horizon-web "$HOME/.config/horizon-iwa/signing.pem" 1.0.0
++```
++
++Output: **`web/out/horizon.swbn`**. Keep the signing key private and backed up;
++a different key creates a different app with separate saves. Never commit the
++key, `web/dist/`, `web/out/` or prepared Minecraft resources. The resulting game
++bundle contains your prepared resources: keep it for your own installation.
++For an encrypted PEM, set `WEB_BUNDLE_SIGNING_PASSPHRASE` when packaging.
++
++The packager includes all lazy resource packs, removes cache-busting queries,
++adds the manifest and icon, sets isolation/security headers and signs the bundle.
++It rejects missing manifest resources and symlinks. Use `web/package.py` first
++to materialize the build's resource symlink into a complete folder.
++
++## Install in Chrome
++
++1. Open `chrome://flags/#enable-isolated-web-app-dev-mode`, enable it and restart Chrome.
++2. Open `chrome://web-app-internals`.
++3. Under **Install IWA from Signed Web Bundle**, select `horizon.swbn`.
++4. Launch Horizon from the Chromebook launcher.
++
++If the flag or install option is unavailable, check Chrome/device policy support.
++See [Chrome's IWA documentation](https://developer.chrome.com/docs/iwa/introduction).
++
++For an update, rebuild and package with the **same key** and a higher version,
++for example `1.0.1`, then use the IWA development update controls. Automatic
++hosted updates are not configured. Do not uninstall to update if you want to
++keep saves. Browser-site saves do not automatically transfer to the IWA's origin.
++
++## Multiplayer and saves
++
++Add your own compatible server in Multiplayer using its `wss://` address.
++Plain `ws://` is blocked by IWA policy. An ordinary Java TCP server still needs
++a compatible WebSocket bridge. Microsoft online-mode authentication remains an
++upstream web limitation. Shared-world relay endpoints are retained.
++
++The former promoted server is no longer added or pinned. An entry already saved
++by the old build remains an ordinary editable/deletable entry, so this update
++does not silently delete saved server data.
++
++Worlds use the app's browser storage. The upstream web port does not yet provide
++world ZIP import/export, and abrupt closing can lose pending writes.
++
++## Development and validation
++
++```sh
++npm test --prefix web/iwa
++```
++
++GitHub Actions runs these packaging tests. Manually dispatch **Chromebook web
++build** with `compile_wasm` enabled to compile the engine without game resources;
++the artifact is not a playable app. Local packaging needs your prepared resources.
++
++Before calling a build ready, test on the target Chromebook:
++
++- Title screen opens without CSP or worker errors in DevTools.
++- Create a world, move, place/break blocks and confirm audio/pointer lock.
++- Save and quit, close the app, reopen it and confirm the world persists.
++- Join your WSS server and check shared-world connections.
++- Start single player with Wi-Fi off; confirm lazy resources still load.
++
++Current validation covers bundle structure, signing and worker URL restrictions
++using synthetic fixtures. Full ChromeOS gameplay and native title-screen checks
++require the prepared game resources and have not been completed for this change.
+diff --git a/web/iwa/icon.svg b/web/iwa/icon.svg
+new file mode 100644
+index 0000000..c8bbd2b
+--- /dev/null
++++ b/web/iwa/icon.svg
+@@ -0,0 +1,4 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
++  <rect width="512" height="512" rx="112" fill="#182c38"/>
++  <path d="M104 120h72v100h160V120h72v272h-72V292H176v100h-72z" fill="#8dd8ae"/>
++</svg>
+diff --git a/web/iwa/package-lock.json b/web/iwa/package-lock.json
+new file mode 100644
+index 0000000..bff47f8
+--- /dev/null
++++ b/web/iwa/package-lock.json
+@@ -0,0 +1,151 @@
++{
++  "name": "horizon-chromebook-iwa",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "horizon-chromebook-iwa",
++      "dependencies": {
++        "wbn": "0.0.10",
++        "wbn-sign": "0.3.3"
++      },
++      "engines": {
++        "node": ">=22.13.0"
++      }
++    },
++    "node_modules/base32-encode": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/base32-encode/-/base32-encode-2.0.0.tgz",
++      "integrity": "sha512-mlmkfc2WqdDtMl/id4qm3A7RjW6jxcbAoMjdRmsPiwQP0ufD4oXItYMnPgVHe80lnAIy+1xwzhHE1s4FoIceSw==",
++      "license": "MIT",
++      "dependencies": {
++        "to-data-view": "^2.0.0"
++      },
++      "engines": {
++        "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
++      }
++    },
++    "node_modules/cborg": {
++      "version": "1.10.2",
++      "resolved": "https://registry.npmjs.org/cborg/-/cborg-1.10.2.tgz",
++      "integrity": "sha512-b3tFPA9pUr2zCUiCfRd2+wok2/LBSNUMKOuRRok+WlvvAgEt/PlbgPTsZUcwCOs53IJvLgTp0eotwtosE6njug==",
++      "license": "Apache-2.0",
++      "bin": {
++        "cborg": "cli.js"
++      }
++    },
++    "node_modules/commander": {
++      "version": "4.1.1",
++      "resolved": "https://registry.npmjs.org/commander/-/commander-4.1.1.tgz",
++      "integrity": "sha512-NOKm8xhkzAjzFx8B2v5OAHT+u5pRQc2UCa2Vq9jYL/31o2wi9mxBA7LIFs3sV5VSC49z6pEhfbMULvShKj26WA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 6"
++      }
++    },
++    "node_modules/mime": {
++      "version": "2.6.0",
++      "resolved": "https://registry.npmjs.org/mime/-/mime-2.6.0.tgz",
++      "integrity": "sha512-USPkMeET31rOMiarsBNIHZKLGgvKc/LrjofAnBlOttf5ajRvqiRA8QsenbcooctK6d6Ts6aqZXBA+XbkKthiQg==",
++      "license": "MIT",
++      "bin": {
++        "mime": "cli.js"
++      },
++      "engines": {
++        "node": ">=4.0.0"
++      }
++    },
++    "node_modules/mute-stream": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/mute-stream/-/mute-stream-1.0.0.tgz",
++      "integrity": "sha512-avsJQhyd+680gKXyG/sQc0nXaC6rBkPOfyHYcFb9+hdkqQkR9bdnkJ0AMZhke0oesPqIO+mFFJ+IdBc7mst4IA==",
++      "license": "ISC",
++      "engines": {
++        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
++      }
++    },
++    "node_modules/picocolors": {
++      "version": "1.1.1",
++      "resolved": "https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz",
++      "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==",
++      "license": "ISC"
++    },
++    "node_modules/read": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/read/-/read-2.1.0.tgz",
++      "integrity": "sha512-bvxi1QLJHcaywCAEsAk4DG3nVoqiY2Csps3qzWalhj5hFqRn1d/OixkFXtLO1PrgHUcAP0FNaSY/5GYNfENFFQ==",
++      "license": "ISC",
++      "dependencies": {
++        "mute-stream": "~1.0.0"
++      },
++      "engines": {
++        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
++      }
++    },
++    "node_modules/to-data-view": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/to-data-view/-/to-data-view-2.0.0.tgz",
++      "integrity": "sha512-RGEM5KqlPHr+WVTPmGNAXNeFEmsBnlkxXaIfEpUYV0AST2Z5W1EGq9L/MENFrMMmL2WQr1wjkmZy/M92eKhjYA==",
++      "license": "MIT",
++      "engines": {
++        "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
++      }
++    },
++    "node_modules/wbn": {
++      "version": "0.0.10",
++      "resolved": "https://registry.npmjs.org/wbn/-/wbn-0.0.10.tgz",
++      "integrity": "sha512-CveWTUFIIm2DRTPt2Q2XSUcBL+v/tYKdzfLDhPQtwE/vH8jqQCa9CvEwHsfFELks5Nurni2rN2DmR/fp3GccRg==",
++      "license": "W3C-20150513",
++      "dependencies": {
++        "cborg": "^1.9.4",
++        "commander": "^4.0.1",
++        "mime": "^2.4.4"
++      },
++      "bin": {
++        "wbn": "bin/wbn.js"
++      },
++      "engines": {
++        "node": ">= 20.0.0"
++      }
++    },
++    "node_modules/wbn-sign": {
++      "version": "0.3.3",
++      "resolved": "https://registry.npmjs.org/wbn-sign/-/wbn-sign-0.3.3.tgz",
++      "integrity": "sha512-tJbQIzCwIz0XjGOEwQnQcNTY0dar5VTDji3GSNwlFBVEm1RyBYZELIz1/ki3AsbdcNPIkK/HKEzWMdgAWD8wPQ==",
++      "license": "W3C-20150513",
++      "dependencies": {
++        "base32-encode": "^2.0.0",
++        "cborg": "^4.2.14",
++        "commander": "^14.0.0",
++        "picocolors": "^1.1.1",
++        "read": "^2.0.0"
++      },
++      "bin": {
++        "wbn-dump-id": "bin/wbn-dump-id.js",
++        "wbn-sign": "bin/wbn-sign.js"
++      },
++      "engines": {
++        "node": ">= 22.13.0",
++        "npm": ">= 10.0.0"
++      }
++    },
++    "node_modules/wbn-sign/node_modules/cborg": {
++      "version": "4.5.8",
++      "resolved": "https://registry.npmjs.org/cborg/-/cborg-4.5.8.tgz",
++      "integrity": "sha512-6/viltD51JklRhq4L7jC3zgy6gryuG5xfZ3kzpE+PravtyeQLeQmCYLREhQH7pWENg5pY4Yu/XCd6a7dKScVlw==",
++      "license": "Apache-2.0",
++      "bin": {
++        "cborg": "lib/bin.js"
++      }
++    },
++    "node_modules/wbn-sign/node_modules/commander": {
++      "version": "14.0.3",
++      "resolved": "https://registry.npmjs.org/commander/-/commander-14.0.3.tgz",
++      "integrity": "sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=20"
++      }
++    }
++  }
++}
+diff --git a/web/iwa/package.json b/web/iwa/package.json
+new file mode 100644
+index 0000000..0594745
+--- /dev/null
++++ b/web/iwa/package.json
+@@ -0,0 +1,8 @@
++{
++  "name": "horizon-chromebook-iwa",
++  "private": true,
++  "type": "module",
++  "engines": { "node": ">=22.13.0" },
++  "scripts": { "package": "node package.mjs", "test": "node --test test.mjs" },
++  "dependencies": { "wbn": "0.0.10", "wbn-sign": "0.3.3" }
++}
+diff --git a/web/iwa/package.mjs b/web/iwa/package.mjs
+new file mode 100644
+index 0000000..510aeaa
+--- /dev/null
++++ b/web/iwa/package.mjs
+@@ -0,0 +1,86 @@
++// Package a complete web/package.py output, including private local resources.
++import { readFileSync, readdirSync, lstatSync, writeFileSync, mkdirSync } from 'node:fs';
++import { resolve, relative, extname, dirname } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createPrivateKey } from 'node:crypto';
++import { BundleBuilder } from 'wbn';
++import { SignedWebBundle, NodeCryptoSigningStrategy, WebBundleId } from 'wbn-sign';
++
++const here = dirname(fileURLToPath(import.meta.url));
++const types = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm',
++    '.json': 'application/json', '.webmanifest': 'application/manifest+json',
++    '.svg': 'image/svg+xml', '.png': 'image/png', '.txt': 'text/plain', '.gz': 'application/gzip' };
++export const csp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; " +
++    "style-src 'self' 'unsafe-inline'; img-src 'self' https: blob: data:; " +
++    "connect-src 'self' https: wss: blob: data:; worker-src 'self'; " +
++    "object-src 'none'; base-uri 'none'; require-trusted-types-for 'script'; trusted-types horizon-worker";
++
++export function buildBundle(site, origin, version) {
++    if (!/^[1-9]\d*(?:\.(?:0|[1-9]\d*)){0,3}$/.test(version)) {
++        throw new Error('Version must be numeric, for example 1.0.0');
++    }
++    for (const name of ['index.html', 'main.js', 'worker.js', 'audio.js',
++        'pkg/horizon-client.js', 'pkg/horizon-client_bg.wasm', 'fs/boot.tar.gz', 'fs/manifest.txt']) {
++        if (!lstatSync(resolve(site, name)).isFile()) throw new Error(`Missing file: ${name}`);
++    }
++    const entries = new Map();
++    function walk(dir) {
++        for (const name of readdirSync(dir).sort()) {
++            const path = resolve(dir, name), stat = lstatSync(path);
++            if (stat.isSymbolicLink()) throw new Error(`Package a materialized folder, not symlinks: ${path}`);
++            if (name.startsWith('.') || /\.(pem|key|swbn)$/i.test(name)) throw new Error(`Unexpected private/build file: ${path}`);
++            if (stat.isDirectory()) walk(path);
++            else if (stat.isFile()) entries.set(relative(site, path).replaceAll('\\', '/'), readFileSync(path));
++        }
++    }
++    walk(site);
++    entries.delete('sw.js');
++    // Packed resources also use cache-busting queries in the regular web build.
++    const manifest = entries.get('fs/manifest.txt').toString().split('\n').map(line => {
++        const fields = line.split('\t');
++        if (fields[2]) fields[2] = fields[2].split('?')[0];
++        if (fields[0]) {
++            const resource = new URL(fields[2] || fields[0], origin + 'fs/res/');
++            if (!resource.href.startsWith(origin + 'fs/') || !entries.has(decodeURIComponent(resource.pathname.slice(1)))) {
++                throw new Error(`Missing or unsafe manifest resource: ${line}`);
++            }
++        }
++        return fields.join('\t');
++    }).join('\n');
++    entries.set('fs/manifest.txt', Buffer.from(manifest));
++    entries.set('index.html', Buffer.from(entries.get('index.html').toString().replace('</head>',
++        '<link rel="manifest" href="/manifest.webmanifest">\n</head>')));
++    entries.set('manifest.webmanifest', Buffer.from(JSON.stringify({
++        id: '/', name: 'Horizon Web', short_name: 'Horizon', version,
++        start_url: '/index.html', scope: '/', display: 'standalone',
++        background_color: '#000000', theme_color: '#182c38',
++        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
++    })));
++    entries.set('icon.svg', readFileSync(resolve(here, 'icon.svg')));
++    const builder = new BundleBuilder('b2');
++    for (const [name, body] of entries) {
++        const headers = { 'content-type': types[extname(name)] || 'application/octet-stream',
++            'content-security-policy': csp, 'cross-origin-opener-policy': 'same-origin',
++            'cross-origin-embedder-policy': 'require-corp', 'cross-origin-resource-policy': 'same-origin' };
++        builder.addExchange(new URL(name, origin).href, 200, headers, body);
++        if (name === 'index.html') builder.addExchange(origin, 200, headers, body);
++    }
++    return builder.createBundle();
++}
++
++async function main() {
++    const [folder, keyFile, version = '1.0.0', output = resolve(here, '../out/horizon.swbn')] = process.argv.slice(2);
++    if (!folder || !keyFile) throw new Error('Usage: npm run package -- SITE_FOLDER KEY.pem [VERSION] [OUTPUT.swbn]');
++    const site = resolve(folder);
++    const key = createPrivateKey({ key: readFileSync(keyFile),
++        passphrase: process.env.WEB_BUNDLE_SIGNING_PASSPHRASE });
++    const origin = new WebBundleId(key).serializeWithIsolatedWebAppOrigin();
++    const bundle = buildBundle(site, origin, version);
++    const signed = await SignedWebBundle.fromWebBundle(bundle, [new NodeCryptoSigningStrategy(key)]);
++    mkdirSync(dirname(resolve(output)), { recursive: true });
++    writeFileSync(output, signed.getSignedWebBundleBytes());
++    console.log(`Created ${resolve(output)}\nApp origin: ${origin}\nVersion: ${version}`);
++}
++if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
++    main().catch(error => { console.error(error.message); process.exitCode = 1; });
++}
+diff --git a/web/iwa/test.mjs b/web/iwa/test.mjs
+new file mode 100644
+index 0000000..2f9ac05
+--- /dev/null
++++ b/web/iwa/test.mjs
+@@ -0,0 +1,63 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { generateKeyPairSync } from 'node:crypto';
++import { Bundle } from 'wbn';
++import { WebBundleId, SignedWebBundle, NodeCryptoSigningStrategy } from 'wbn-sign';
++import { buildBundle } from './package.mjs';
++import vm from 'node:vm';
++
++test('bundle resolves startup and lazy packs without query strings and signs', async () => {
++    const dir = mkdtempSync(join(tmpdir(), 'horizon-iwa-'));
++    try {
++        mkdirSync(join(dir, 'pkg')); mkdirSync(join(dir, 'fs'));
++        for (const f of ['main.js', 'worker.js', 'audio.js', 'pkg/horizon-client.js',
++            'pkg/horizon-client_bg.wasm', 'fs/boot.tar.gz', 'fs/worldgen.tar.gz']) writeFileSync(join(dir, f), 'fixture');
++        writeFileSync(join(dir, 'index.html'), '<html><head></head><body></body></html>');
++        writeFileSync(join(dir, 'fs/manifest.txt'), 'worldgen/test.json\t2\t../worldgen.tar.gz?v=abc\n');
++        const { privateKey } = generateKeyPairSync('ed25519');
++        const origin = new WebBundleId(privateKey).serializeWithIsolatedWebAppOrigin();
++        const bytes = buildBundle(dir, origin, '1.0.0');
++        const bundle = new Bundle(bytes);
++        const get = p => bundle.getResponse(origin + p);
++        assert.equal(get('pkg/horizon-client_bg.wasm').headers['content-type'], 'application/wasm');
++        assert.equal(new TextDecoder().decode(get('fs/manifest.txt').body), 'worldgen/test.json\t2\t../worldgen.tar.gz\n');
++        const manifest = JSON.parse(new TextDecoder().decode(get('manifest.webmanifest').body));
++        assert.equal(manifest.version, '1.0.0');
++        assert.equal(get(manifest.start_url.slice(1)).status, 200);
++        assert.equal(get('icon.svg').status, 200);
++        assert.equal(get('').status, 200);
++        const signed = await SignedWebBundle.fromWebBundle(bytes, [new NodeCryptoSigningStrategy(privateKey)]);
++        assert.equal(SignedWebBundle.fromBytes(signed.getSignedWebBundleBytes()).getWebBundleId(), new WebBundleId(privateKey).serialize());
++        assert.throws(() => buildBundle(dir, origin, 'invalid'), /Version/);
++        rmSync(join(dir, 'fs/worldgen.tar.gz'));
++        assert.throws(() => buildBundle(dir, origin, '1.0.0'), /Missing or unsafe/);
++    } finally { rmSync(dir, { recursive: true, force: true }); }
++});
++
++test('worker policy allows only the bundled worker and hands it shared memory', () => {
++    const source = readFileSync(new URL('../../crates/horizon-os/src/workers.rs', import.meta.url), 'utf8')
++        .split('inline_js = r#"')[1].split('"#)]')[0].replaceAll('export function', 'function');
++    let policy, started, message;
++    const context = vm.createContext({ URL, location: { href: 'isolated-app://test/index.html' }, window: {},
++        trustedTypes: { createPolicy: (_, rules) => { policy = rules; return rules; } },
++        Worker: class { constructor(url) { started = url; } postMessage(value) { message = value; } }, console });
++    vm.runInContext(source + '\nhorizon_spawn_worker("module", "memory", 42, "test", 4096);', context);
++    assert.equal(started, 'isolated-app://test/worker.js');
++    assert.equal(message.memory, 'memory');
++    assert.throws(() => policy.createScriptURL('https://example.com/evil.js'), /Unexpected/);
++});
++
++test('automatic multiplayer transport uses WSS inside an IWA, preserving local HTTP', () => {
++    const source = readFileSync(new URL('../../crates/horizon-os/src/net.rs', import.meta.url), 'utf8')
++        .split('inline_js = r#"')[1].split('"#)]')[0].replaceAll('export function', 'function');
++    for (const [protocol, expected] of [['isolated-app:', 'wss'], ['https:', 'wss'], ['http:', 'ws']]) {
++        let address;
++        const context = vm.createContext({ location: { protocol },
++            WebSocket: class { constructor(url) { address = url; } }, console });
++        vm.runInContext(source + '\nopen(1, null, "example.com", 25565, null, []);', context);
++        assert.equal(address, `${expected}://example.com:25565/`);
++    }
++});
+diff --git a/web/main.js b/web/main.js
+index 76d1759..b0f6618 100644
+--- a/web/main.js
++++ b/web/main.js
+@@ -26,6 +26,7 @@ async function webgpu() {
+ // A host that sends no isolation headers (a static host) gets them from the
+ // service worker: once it controls the page, a reload makes it isolated.
+ async function cacheWorker() {
++    if (location.protocol === "isolated-app:") return;
+     const workers = navigator.serviceWorker;
+     if (!workers) return;
+     try {
+@@ -51,6 +52,10 @@ async function cacheWorker() {
+ // The large files' addresses with their content hash (build.json), which the
+ // service worker keeps them by.
+ async function versioned() {
++    // Bundle exchanges have exact URLs; no service-worker cache busting needed.
++    if (location.protocol === "isolated-app:") {
++        return { wasm: "pkg/horizon-client_bg.wasm", boot: "fs/boot.tar.gz" };
++    }
+     const files = await fetch("build.json", { cache: "no-store" })
+         .then((r) => (r.ok ? r.json() : {}))
+         .catch(() => ({}));
+-- 
+2.52.0
+
