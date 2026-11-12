@@ -1,5 +1,7 @@
 # Horizon in the browser
 
+For the Chromebook app, see [IWA build and installation](iwa/README.md).
+
 An experimental build of the Horizon client for the web: the same game code
 compiled to WebAssembly, drawing through the browser's WebGPU. It creates and
 opens single-player worlds, joins offline-mode Horizon and Eaglercraft
@@ -189,7 +191,7 @@ world `Test` in creative mode at start.
   login, redirect, error) becomes the login disconnect, so the client shows
   the reason. The server list's status is the plugin's `Accept: motd` text
   query, turned into a vanilla status. Checked against
-  `wss://eagler.carrot-craft.org` (EaglercraftXServer 1.1.1 on Velocity):
+  an EaglercraftXServer 1.1.1 instance on Velocity:
   login, configuration, play and keep-alives.
 - **Profile** (`horizon-client/src/profile.rs`, `title/profile_screen.rs`):
   the name is the offline name's line in `horizon-player.txt`, so every join

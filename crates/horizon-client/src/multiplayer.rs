@@ -438,11 +438,6 @@ pub fn add_official_server(game_dir: &Path) -> std::io::Result<()> {
     horizon_os::fs::write(marker, format!("{address}\n"))
 }
 
-/// The web build's featured server, in place of the official one (browsers reach servers only
-/// over a WebSocket): always first in the list, and the player can't edit, move or delete it.
-#[cfg(target_arch = "wasm32")]
-pub const FEATURED_SERVER: (&str, &str) = ("Carrotcraft", "wss://eagler.carrot-craft.org");
-
 /// Draws a featured row's label after its name at `(x, y)`, its row index given.
 pub type FeaturedLabel = dyn Fn(&mut HudBatch, &HudAtlas, usize, f32, f32);
 
@@ -464,9 +459,6 @@ fn featured() -> Vec<(String, String)> {
     let set = FEATURED.with(|f| f.borrow().as_ref().map(|f| f.0.clone()));
     let list = match set {
         Some(list) => list,
-        #[cfg(target_arch = "wasm32")]
-        None => vec![(FEATURED_SERVER.0.to_owned(), FEATURED_SERVER.1.to_owned())],
-        #[cfg(not(target_arch = "wasm32"))]
         None => Vec::new(),
     };
     list.into_iter()

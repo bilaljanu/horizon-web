@@ -1,0 +1,8 @@
+{
+  "name": "horizon-chromebook-iwa",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": { "package": "node package.mjs", "test": "node --test test.mjs" },
+  "dependencies": { "wbn": "0.0.10", "wbn-sign": "0.3.3" }
+}

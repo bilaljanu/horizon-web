@@ -22,8 +22,16 @@ pub use std::thread::Result;
 
 #[wasm_bindgen(inline_js = r#"
 let pageModule, pageMemory;
+// IWA Trusted Types permits only this bundled worker, never an arbitrary URL.
+const workerURL = new URL("worker.js", location.href).href;
+const workerPolicy = globalThis.trustedTypes?.createPolicy("horizon-worker", {
+    createScriptURL(value) {
+        if (value !== workerURL) throw new TypeError("Unexpected worker URL");
+        return value;
+    },
+});
 function start(ptr, name, stack) {
-    const worker = new Worker(new URL("worker.js", location.href), { type: "module", name });
+    const worker = new Worker(workerPolicy ? workerPolicy.createScriptURL(workerURL) : workerURL, { type: "module", name });
     // A thread this worker starts: the page starts it. Its sockets live on
     // the page too (net.rs).
     worker.onmessage = ({ data }) =>

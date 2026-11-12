@@ -1,0 +1,45 @@
+name: Chromebook web build
+on:
+  push:
+    paths: ['web/**', '.github/workflows/chromebook-web.yml', 'crates/horizon-os/src/**']
+  pull_request:
+    paths: ['web/**', '.github/workflows/chromebook-web.yml', 'crates/horizon-os/src/**']
+  workflow_dispatch:
+    inputs:
+      compile_wasm:
+        description: Compile the engine without private game resources
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/iwa/package-lock.json
+      - run: npm ci --prefix web/iwa
+      - run: npm test --prefix web/iwa
+  wasm:
+    if: github.event_name == 'workflow_dispatch' && inputs.compile_wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          rustup toolchain install nightly-2026-10-14 --profile minimal --component rust-src
+          rustup target add wasm32-unknown-unknown --toolchain nightly-2026-10-14
+          cargo install wasm-bindgen-cli --version 0.2.129 --locked
+      - name: Compile without Minecraft resources
+        run: PROFILE=fast BUNDLE=0 web/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizon-web-engine-needs-local-resources
+          path: web/dist/
+          if-no-files-found: error
+          retention-days: 7

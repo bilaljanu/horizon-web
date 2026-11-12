@@ -18485,7 +18485,7 @@ pub fn run_with() -> Result<()> {
     if !options.offscreen && !synchronous_startup(&options) {
         #[cfg(feature = "heartbeat")]
         horizon_client::heartbeat::start();
-        // The web build pins its own featured server instead (`multiplayer::FEATURED_SERVER`).
+        // The web build starts without promoted servers.
         #[cfg(not(target_arch = "wasm32"))]
         {
             let player_dir = horizon_client::logging::player_dir();

@@ -26,6 +26,7 @@ async function webgpu() {
 // A host that sends no isolation headers (a static host) gets them from the
 // service worker: once it controls the page, a reload makes it isolated.
 async function cacheWorker() {
+    if (location.protocol === "isolated-app:") return;
     const workers = navigator.serviceWorker;
     if (!workers) return;
     try {
@@ -51,6 +52,10 @@ async function cacheWorker() {
 // The large files' addresses with their content hash (build.json), which the
 // service worker keeps them by.
 async function versioned() {
+    // Bundle exchanges have exact URLs; no service-worker cache busting needed.
+    if (location.protocol === "isolated-app:") {
+        return { wasm: "pkg/horizon-client_bg.wasm", boot: "fs/boot.tar.gz" };
+    }
     const files = await fetch("build.json", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : {}))
         .catch(() => ({}));
