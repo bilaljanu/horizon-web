@@ -14,7 +14,7 @@ Horizon's own format.
 | Templates | `crates/horizon-shader-api/templates/` | post, sky, material |
 | Example pack | `crates/horizon-shader-api/packs/golden_hour` | a warm sky and two post passes |
 | In the game: every stage | Options > Video Settings > Shaders > Shader Packs | sky, material, post passes, hot reload |
-| The registry and the launcher | `shader` kind ([api/mod-index.md](api/mod-index.md)); the Mods page's Shader packs tab | checked, then installed into `shaderpacks/` |
+| Pack tools and the Mods page | the mod index's `shader` kind; the Mods page's Shader packs tab | checked, then installed into `shaderpacks/` |
 
 ## Quick start
 
@@ -64,8 +64,7 @@ and the whole label when its name was shortened to fit. Leaving the page saves t
 ## Testing a pack frame by frame
 
 A pack that keeps something from frame to frame (`history`, eased values) draws a little differently in every run,
-as frames come when they come. With `HORIZON_STILL=1` and the world frozen the scene holds still
-([agent-control.md](agent-control.md#repeatable-screenshots)), and
+as frames come when they come. With `HORIZON_STILL=1` and the world frozen the scene holds still, and
 
 ```sh
 horizon-ctl screenshot-sequence 64 50 frame64.png

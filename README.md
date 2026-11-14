@@ -44,11 +44,11 @@ Continue with the [IWA packaging steps](web/iwa/README.md#package-the-app).
 
 ## Repository map
 
-- `web/` — browser loader, resource packaging and development server.
+- `html/` — the game page, loader, audio and worker bootstrap.
+- `web/` — browser build scripts, resource packaging and development server.
 - `web/iwa/` — Chromebook packaging, tests and installation guide.
-- `crates/` — Rust game engine and platform support.
+- `crates/` — Rust game engine and browser platform support.
 - `docs/`, `tests/`, `tools/` — engine documentation and developer checks.
-- `launcher/` — upstream native launcher, not needed to install the IWA.
 
 The engine layout is retained so upstream fixes remain easier to merge.
 GitHub Actions → **Chromebook web build** checks packaging and can compile a

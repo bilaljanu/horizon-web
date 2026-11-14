@@ -2,7 +2,7 @@
 
 The 40 areas changed most often in the 30 days to 2026-10-23 (commits on main touching the area; `game.rs` is
 counted only for the game loop because nearly every gameplay change touches it). The crate map, how `Game` is
-organised and how to build and test are in [AGENTS.md](../AGENTS.md).
+organised and how to build and test are in this document and the [root README](../README.md).
 
 Gameplay lives in the `horizon-client` library; `main.rs` is a thin executable calling
 `entry::main`. The reusable modules, control tool and probes belong to `horizon-client-lib`,
@@ -33,13 +33,13 @@ command above to inspect the selection rather than relying on historical counts.
 | 4 | World generation (153) | `W/worldgen.rs`, `W/worldgen/` (`generator*.rs`, `feature_graph.rs`, `structure/`, `placement/`), `L/vanillagen.rs` | chunk_generation, worldgen, server_world_gen, world_spawn, feature_graph, feature_placement, decoration and the other worldgen harnesses |
 | 5 | Multiplayer client, packets in (145) | `G/remote.rs` (`fn handle_packet`, `fn tick_remote`), `G/remote_*.rs`, `L/net.rs` | dedicated_server, server_entities, lan_e2e (all) |
 | 6 | Agent control, horizon-ctl (145) | `L/control.rs`, `L/bin/horizon-ctl/`, `G/control.rs`, `G/agent.rs`, `G/events.rs`, `G/ui_control.rs` | `python3 tools/agent_control_e2e.py`; `cargo test -p horizon-client-lib --bin horizon-ctl` |
-| 7 | CI and release (134) | `.github/workflows/` (`ci.yml`, `parity.yml`, `release.yml`, `launcher.yml`), `tools/ci/`, `tools/parity.py`, `tools/pr_ready.py` | `python3 -m unittest discover -s tests`; actionlint (`.github/actionlint.yaml`) |
+| 7 | Browser build and checks (134) | `.github/workflows/chromebook-web.yml`, `web/build.sh`, `web/package.py`, `tools/parity.py`, `tools/pr_ready.py` | `npm test --prefix web/iwa`; `python3 -m unittest discover -s tests` |
 | 8 | LAN host: connections, play state, tracking (133) | `L/lan/` (`conn.rs`, `hub.rs` + `hub/`, `chunks.rs`, `entity.rs`, `tracking.rs`, `guest.rs`, `playerdata.rs`), `G/lan.rs` | lan, lan_e2e (all), `cargo test -p horizon-client --test lan_bot` |
 | 9 | Renderer core (132) | `R/gfx.rs` (`Renderer::new`, `Renderer::render`), `R/gfx/` (cull, occlusion, translucency, upload, timing, lod) | client_graphics, culling_rays, translucency; `horizon-client --benchmark standard` |
-| 10 | Launcher (124) | `launcher/src/` (`main.rs`, `backend.rs`, `cli.rs`, `mcp.rs`, `servers_page.rs`) | `cd launcher && cargo test`; `python3 tools/launcher_mcp_e2e.py` |
+| 10 | Browser page and loader (124) | `html/` (`index.html`, `main.js`, `worker.js`, `audio.js`), `web/` (`build.sh`, `bundle.py`, `serve.py`), `web/iwa/` | `npm test --prefix web/iwa`; `PROFILE=fast BUNDLE=0 web/build.sh` |
 | 11 | Mob types and species (117) | `L/mobs.rs`, `L/mobs/species.rs`, `L/mobs/data.rs`, `L/mobs/living.rs`, `L/mobs/drops.rs`, `L/mobs/gear.rs` | mob_attributes, entity_attribute, entity_death_loot, mob_ai |
 | 12 | Guests' actions on a server (98) | `G/lan_actions.rs` (`fn as_guest`, `fn tick_guests`), `G/lan_{attributes,pvp,chat,crafting,stations,trading,mount_menu,waypoints}.rs` | server_player_combat, server_player_damage, server_player_targets, lan_e2e (all) |
-| 13 | Modpack porting, mod content (97) | `crates/horizon-port-pack/`, `L/mod_content.rs`, `tools/port_*.py` | `cargo test -p horizon-port-pack`; `python3 tools/mod_port_harness.py` |
+| 13 | Content mods (97) | `L/mod_content.rs`, `crates/horizon-mods/` | `cargo test -p horizon-mods` |
 | 14 | Mob AI (96) | `L/mobs/ai.rs`, `goals.rs`, `brain.rs`, `*_brain.rs`, `nav.rs`, `path.rs`, `control.rs` | mob_ai (probe `examples/mob_ai_probe.rs`; known failure on main: drowned_*, #290) |
 | 15 | Items and item use (96) | `I/items.rs`, `I/item_data.rs`, `G/hand.rs`, `G/consume.rs`, `G/using_item.rs`, `G/potions.rs`, `R/effects.rs`, `G/item_actions.rs` (`fn use_item`); game.rs `fn use_hand` | use_item_on, item_use, item_use_lifecycle, consumable, consume_effect, status_effect |
 | 16 | Options and settings screens (93) | `R/options_ui.rs`, `G/options.rs`, `R/settings.rs`, `R/options_file.rs`, `R/graphics_ui.rs`, `R/graphics.rs` | options, toggle_keys |
@@ -56,16 +56,16 @@ command above to inspect the selection rather than relying on historical counts.
 | 27 | Vehicles and mounts (54) | `G/boats.rs`, `G/boat_passengers.rs`, `G/minecarts.rs`, `G/mounts.rs`, `G/mount_menu.rs`, `G/llamas.rs`, `G/passengers.rs` | server_entities, lan_e2e boats minecarts riding mounts |
 | 28 | Villagers, trading, raids (50) | `L/mobs/villager*.rs`, `L/merchant.rs`, `G/trading.rs`, `G/villagers.rs`, `L/raid.rs`, `G/raids.rs`, `L/gossip.rs` | trading, raid, mob_ai |
 | 29 | Title, worlds, startup (49) | `L/title.rs` + `L/title/`, `G/startup_menu.rs`, `R/title_edition.rs`, `G/loading_window.rs` (the first renderer, `start_game`), `G/resource_load.rs` (the startup resource load) | world_options; `cargo test -p horizon-client --lib title` |
-| 30 | Dedicated server, horizon-server (48) | `G/dedicated.rs`, `G/dedicated/status.rs`, `crates/horizon-server/`, `crates/horizon-server-files/` | dedicated_server, server_files, user_cache, online_mode, server_ops_feedback |
+| 30 | Dedicated server (48) | `G/dedicated.rs`, `G/dedicated/status.rs`, `crates/horizon-server-files/` | dedicated_server, server_files, user_cache, online_mode, server_ops_feedback |
 | 31 | Particles and client effects (46) | `R/particles.rs`, `G/render_tick.rs`, `G/level_particles.rs`, `L/animate_tick.rs` | particle_providers, block_particles, entity_particles, emitter_particles, marker_particles |
 | 32 | Bosses and the End (45) | `G/dragon.rs`, `G/wither.rs`, `G/end.rs` | server_dragon, forced_end, end_podium, end_gateway |
 | 33 | Protocol and packets (44) | `crates/horizon-protocol/src/` (`packets/play.rs`, `entity_data.rs`, `connection.rs`) | dedicated_server, online_mode, secure_chat; `cargo test -p horizon-protocol` |
-| 34 | Multiplayer and LAN screens, friends (44) | `L/multiplayer.rs`, `G/lan_screen.rs`, `G/friends.rs`, `L/friends_screen.rs`, `crates/horizon-friends/`, `crates/horizon-relay/` | lan, world_options; `python3 tools/test_friends.py` |
+| 34 | Multiplayer and LAN screens, friends (44) | `L/multiplayer.rs`, `G/lan_screen.rs`, `G/friends.rs`, `L/friends_screen.rs`, `crates/horizon-friends/` | lan, world_options; `python3 tools/test_friends.py` |
 | 35 | Dispensers (43) | `G/dispenser.rs`, `G/dispense_fixture.rs` (the harness side) | dispenser |
 | 36 | Audio and music (38) | `R/audio.rs`, `R/sound_engine.rs`, `R/sound_events.rs`, `L/music.rs`, `G/music.rs`, `L/ambience.rs`, `G/subtitle_hud.rs` | sound_engine, sound_event, music, situational_music, ambient_sound, subtitle |
 | 37 | Integrated server and levels (34) | `G/integrated.rs`, `G/levels.rs`, `G/server_travel.rs` | server_dimension_players, `lan_e2e` (server-thread by default; portals, levels, distance, lava) |
 | 38 | Command parsing (34) | `C/` (`args.rs`, `selector.rs`, `tree_*.rs`, `vanilla.rs`); `cargo test -p horizon-command` | command_parse (corpus `tools/command_parse_corpus.py`) |
-| 39 | Benchmarks and telemetry (34) | `L/benchmark.rs`, `tools/perf_bench.py`, `R/telemetry.rs`, `crates/horizon-telemetry*/`, `crates/horizon-bench/` | `python3 -m unittest tests.test_perf_bench`; [benchmark.md](benchmark.md) |
+| 39 | Benchmarks and telemetry (34) | `L/benchmark.rs`, `R/telemetry.rs`, `crates/horizon-telemetry/`, `crates/horizon-bench/` | `cargo test -p horizon-bench`; [benchmarks](README.md#benchmarks) |
 | 40 | Explosions and TNT (31) | `G/explosion.rs`, `G/tnt.rs` | lan_e2e blast; no dedicated harness yet |
 
 Controller glyphs (`R/pad_glyph.rs`, drawn by the gameplay guide, notices, splitscreen prompts and declared

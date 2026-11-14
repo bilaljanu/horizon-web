@@ -113,7 +113,7 @@ show the expected sentences as translation keys.
   would say still goes through its status and into its recent messages.
 - `horizon-ctl narration` prints the status, whether text-to-speech is
   there, and the last 32 messages its status let through, oldest first
-  ([horizon-ctl commands](horizon-ctl-commands.md)).
+  (`horizon-ctl narration`).
 
 ## Known differences from vanilla
 

@@ -32,7 +32,7 @@ how the world is fed to the GPU.
 - **Debug overlay.** GPU time per stage and pass (timestamp queries), the targets each pass writes (show any of them
   full-screen), the pack's options and its compile errors.
 - **Budgets.** A pack declares the targets and passes it needs; the renderer refuses more than its limits, and the
-  benchmark ([benchmark-report.md](../benchmark-report.md)) records the pack and its cost, so "fast" stays measured.
+  benchmark records the pack and its cost, so "fast" stays measured.
 - **Off by default.** Without a pack the renderer is vanilla's look, and no pack code runs.
 
 ## The pack format (schema 1)
@@ -270,7 +270,7 @@ and particles (the material stage covers terrain only).
 - 2026-10-31: API 0.1 (additions): translucent terrain in the shadow pass: `shadow_map_translucent`
   and `shadow_color`, so a pack can tint the light that passes through water and stained glass.
 - 2026-10-31: API 0.1 (additions): `Frame.mods`, eight `vec4<f32>` a native mod hands the pack it bundles each
-  frame (`native_shader_params` in docs/native-mods.md), all 0 when no mod sets them.
+  frame (`native_shader_params`), all 0 when no mod sets them.
 - 2026-10-31: API 0.1 (additions): `[shadow]`: the engine draws the solid terrain the light sees
   into a distorted depth map each frame, which the material and post stages read as `shadow_map`
   with `shadow_sampler` and the prelude's `shadow_position`; the frame's `light_direction`,

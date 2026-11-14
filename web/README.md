@@ -20,7 +20,7 @@ screen's Friends button).
 ## Build and run
 
 You need the prepared resources in `.local/horizon-client/26.3` (see the main
-README's *Build from source*), and once:
+README's *Build the game*), and once:
 
 ```sh
 rustup target add wasm32-unknown-unknown
@@ -99,7 +99,7 @@ world `Test` in creative mode at start.
   the first read fetches and unpacks all of them in one request (each file
   alone if that fails). With 40 ms of latency a new world's player spawned
   12 s after the title's first frame with a request per file, 4 s with the pack.
-- **Startup** (`web/main.js`): check for WebGPU, start the service worker, load
+- **Startup** (`html/main.js`): check for WebGPU, start the service worker, load
   the WebAssembly, download and install the archive, load the player's saved
   files, then `horizon_start()`. The resources load on a worker, as on native,
   while the first renderer opens asynchronously (`Loading::resumed`, because
@@ -112,7 +112,7 @@ world `Test` in creative mode at start.
   of `limit_display_fps` the redraw skips the animation frames that come
   before the limit's slot (`FramerateLimiter::frame_due`). In a world at
   60 fps the page's thread is busy about 60–100 ms a second.
-- **Threads** (`horizon-os/src/workers.rs`, `web/worker.js`): the module is
+- **Threads** (`horizon-os/src/workers.rs`, `html/worker.js`): the module is
   built with atomics on a shared memory (std rebuilt on nightly, the linker's
   `--shared-memory`). Each spawned thread is a module worker that instantiates
   the same module on that memory and runs the closure it was handed. Workers
@@ -150,7 +150,7 @@ world `Test` in creative mode at start.
   play as that Escape and pauses (`horizon_os::web::pointer_lock_lost`).
 - **Sound**: cpal's Web Audio backend (`audio.rs` mixes as on native). Its
   `AudioContext` starts suspended until the player clicks or presses a key;
-  `web/audio.js` wraps the class before the game's glue loads (the glue keeps
+  `html/audio.js` wraps the class before the game's glue loads (the glue keeps
   the one it finds) and resumes every context on the first click or key.
   Sound files are in `manifest.txt`, fetched when a sound first plays, by the
   decoder and music workers. The mixer and decoded-sound locks are shared
@@ -159,7 +159,7 @@ world `Test` in creative mode at start.
 - **Controllers**: gilrs reads the browser's Gamepad API. The DualSense's own
   output (rumble, adaptive triggers, lights) needs HID, which pages don't
   have: `horizon-dualsense` builds without it, as on iOS.
-- **Caching** (`web/sw.js`): `build.sh` writes `build.json` with the content
+- **Caching** (`html/sw.js`): `build.sh` writes `build.json` with the content
   hashes of the WebAssembly and `boot.tar.gz`, and the page asks for them as
   `…?v=<hash>`. The service worker keeps those until a build changes them;
   everything else goes to the network first and falls back to its copy offline.

@@ -1,9 +1,9 @@
 name: Chromebook web build
 on:
   push:
-    paths: ['web/**', '.github/workflows/chromebook-web.yml', 'crates/horizon-os/src/**']
+    paths: ['html/**', 'web/**', '.github/workflows/chromebook-web.yml', 'crates/horizon-os/src/**']
   pull_request:
-    paths: ['web/**', '.github/workflows/chromebook-web.yml', 'crates/horizon-os/src/**']
+    paths: ['html/**', 'web/**', '.github/workflows/chromebook-web.yml', 'crates/horizon-os/src/**']
   workflow_dispatch:
     inputs:
       compile_wasm:

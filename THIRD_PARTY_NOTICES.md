@@ -79,7 +79,7 @@ Copyright (c) Microsoft Corporation. It is not covered by Horizon's MIT license.
 Distributable Code terms are the Windows SDK's: end users get terms that protect the code and Microsoft at least as
 much, and the distributor indemnifies Microsoft. The project accepted them on 2026-11-08. Its open-source part is also under the University of Illinois/NCSA license (`LICENSE-LLVM.txt`). Both
 files ship beside the DLL as `DXC-LICENSE-MS.txt` and `DXC-LICENSE-LLVM.txt`, with `DXC-NOTICE.txt`
-(`packaging/windows/`), which tells players those terms apply and that deleting the DLL brings back FXC.
+(shipped beside the DLL), which tells users those terms apply and that deleting the DLL brings back FXC.
 
 - Only x64: the Windows SDK's list of distributable files
   ([REDIST.TXT lists](https://learn.microsoft.com/en-us/legal/windows-sdk/redist), updated 2024-10-21) names
@@ -88,15 +88,6 @@ files ship beside the DLL as `DXC-LICENSE-MS.txt` and `DXC-LICENSE-LLVM.txt`, wi
   doesn't contain, so the SDK's list is the one followed. The Windows ARM64 build ships no DXC and compiles with FXC.
 - No `dxil.dll`: since DXC 1.8.2505 the compiler signs shaders with its own validator and no longer loads it, and
   wgpu never does.
-
-## libmimalloc-sys and mimalloc
-
-`third_party/libmimalloc-sys` is [libmimalloc-sys](https://github.com/purpleprotocol/mimalloc_rust)
-0.1.49 by Octavian Oncescu, with the [mimalloc](https://github.com/microsoft/mimalloc) v3 sources it
-bundles (Copyright (c) 2018-2025 Microsoft Corporation, Daan Leijen), both under the MIT license
-(`LICENSE.txt` and `c_src/mimalloc/v3/LICENSE` in that folder). It holds only the v3 sources. One
-change: `mi_popcount` in `include/mimalloc/bits.h` uses mimalloc's portable bit count on MSVC
-x86/x64 instead of the POPCNT instruction, which CPUs before Nehalem lack (#7264).
 
 ## Pixelify Sans
 
@@ -133,32 +124,6 @@ and `optical_flow.rs` follows the SDK's `sdk/src/components/opticalflow/ffx_opti
 (its passes, their order and their dispatch sizes). Copyright (C) 2024 Advanced Micro Devices,
 Inc., under the MIT license, whose text heads each file. AMD and FidelityFX are AMD's
 trademarks; Horizon is not affiliated with AMD.
-
-## Mod loader logos
-
-The launcher shows the logo of the mod loader an instance plays with, and offers the logos as
-instance icons.
-
-- `launcher/assets/logos/{fabric,quilt,neoforge,forge}.png` are the loaders' logos as the launcher
-  mockup on [playhorizon.dev/launcher](https://playhorizon.dev/launcher) shows them (horizon-site
-  `public/media/launcher/*.webp`, converted to PNG), each its project's own mark:
-  [Fabric](https://fabricmc.net/), [Quilt](https://quiltmc.org/) (its art is
-  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)),
-  [NeoForged](https://neoforged.net/) (its art, by Ridanisaurus, is
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) and
-  [Minecraft Forge](https://minecraftforge.net/). They name the loader an instance runs.
-
-Each logo belongs to its project. Showing it says which loader an instance runs; it does not mean
-the project endorses Horizon.
-
-## Sign in with Microsoft
-
-The launcher's sign-in buttons follow Microsoft's published branding guidelines for apps that sign in
-with Microsoft accounts
-([Sign in with Microsoft branding](https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-branding-in-apps)).
-The four-square Microsoft symbol in `launcher/src/microsoft.rs` reproduces the squares, positions and
-colours of Microsoft's official `ms-symbollockup_mssymbol_19.svg` from that page, unmodified. Microsoft
-and its logo are trademarks of the Microsoft group of companies; Horizon is not endorsed by Microsoft.
 
 ## CIT Resewn
 

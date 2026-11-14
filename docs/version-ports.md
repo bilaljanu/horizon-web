@@ -277,10 +277,9 @@ harness passes against NEW, CI's vanilla data (`tools/ci/vanilla-data.sh`) and t
 been switched to NEW (the version store's files are copied in, then `lab.py decompile` runs once for the full
 sources), and a playtest shows a world loads and a vanilla NEW client can join a Horizon LAN world.
 
-A Horizon release then ships as usual (`docs/release-flow.md`), labelled `feature` with "Minecraft NEW" in its
-title. Its `research-lock.json` makes `horizon-prepare` ask for NEW, so players must have played NEW once in the
-official launcher; the launcher already reads each release's game version from its `research-lock.json`, so players
-who haven't can keep the previous Horizon release. Supporting two Minecraft versions in one build is out of scope.
+A Horizon release then ships as usual, labelled `feature` with "Minecraft NEW" in its title.
+Its `research-lock.json` makes `horizon-prepare` ask for NEW, so resources must come from an
+installation that has played NEW once. Supporting two Minecraft versions in one build is out of scope.
 
 ## Turning on the daily agent
 

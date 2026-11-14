@@ -22,6 +22,7 @@ import subprocess
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parent
+ROOT = WEB.parent
 DIST = WEB / "dist"
 PAGE_FILES = ("index.html", "main.js", "audio.js", "worker.js", "sw.js")
 
@@ -44,7 +45,7 @@ def folder(out: Path) -> None:
         shutil.rmtree(site)
     site.mkdir(parents=True)
     for name in PAGE_FILES:
-        shutil.copy2(WEB / name, site / name)
+        shutil.copy2(ROOT / "html" / name, site / name)
     shutil.copytree(DIST / "pkg", site / "pkg")
     fs = site / "fs"
     fs.mkdir()

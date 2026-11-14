@@ -12,9 +12,9 @@ Optimizations are not extras; they are part of the game in every build.
 cargo build --release -p horizon-client --no-default-features --features audio,controllers
 ```
 
-Best effort: CI builds and tests the default only. The server build (`--no-default-features`,
-docs/server.md) compiles the same gates, so the code keeps compiling, but nobody plays it as a
-client before a release. [horizon-rust/horizon-plain](https://github.com/horizon-rust/horizon-plain)
+Best effort: CI builds and tests the default only. The dedicated-server build
+(`--no-default-features`) compiles the same gates, so the code keeps compiling, but nobody plays
+it as a client before a release. [horizon-rust/horizon-plain](https://github.com/horizon-rust/horizon-plain)
 builds it from each official release tag, unsigned.
 
 What changes in that build:
@@ -37,12 +37,9 @@ gate guards.
 
 ## Not behind the feature
 
-- The launcher (`launcher/`) holds the Wardrobe, the Shop, the featured servers page, its themes,
-  the telemetry consent and updates. A build of the game alone has none of them; without the
-  launcher's consent the game keeps no crash or performance report (docs/telemetry.md).
 - The graphics screen's fullbright, dynamic lights and hiding block-break particles: renderer
   options, off by default (docs/extras.md). A `horizon-extras.txt` left by an official install is
   still read.
-- The mod runtime: nothing installs a mod without the launcher, so it stays idle.
+- The mod runtime: nothing installs a mod by default, so it stays idle.
 - The `horizon` brand reply to a Horizon server, for its protocol extensions (`net.rs`).
 - Agent control (`--control`, `horizon-ctl`), controllers, HDR, shader packs.

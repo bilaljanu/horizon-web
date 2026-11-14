@@ -1,9 +1,8 @@
 # Content API
 
-Where another launcher puts content in a Horizon game folder, how it turns content on and off, and what it checks
-first. It is the install side of the [Launch API](launch.md). The registry's file it installs from is
-[mod-index.md](mod-index.md). `horizon-launcher` is the reference implementation. Proposed in
-horizon-rust/horizon#10562.
+Where a launcher or tool puts content in a Horizon game folder, how it turns
+content on and off, and what it checks first. It is the install side of the
+Launch API.
 
 ## Overview
 
@@ -15,7 +14,7 @@ horizon-rust/horizon#10562.
 
 ## What a build loads
 
-Ask before offering anything: `horizon-client --launch-api` has `content` ([launch-reference.md](launch-reference.md)).
+Ask before offering anything: `horizon-client --launch-api` has `content`.
 Offer a version only when this build loads it:
 
 | Kind | Loads when | From `content` |
@@ -43,18 +42,15 @@ starts and writes them when the player changes a setting.
 
 - **When a change applies.** Every change above applies at the next start. While the game plays, its own
   screens switch packs, shader packs and assets-only content mods live; a content mod that adds blocks, items,
-  entity types or world generation loads only at start ([mods.md](../mods.md)).
-- **Native mods** need Horizon rebuilt with them (horizon-mixins, [native-mods.md](../native-mods.md)). A launcher
-  that doesn't build Horizon doesn't offer them.
+  entity types or world generation loads only at start.
 - **A modpack** isn't copied into the game folder. A launcher reads its `horizon-modpack.toml`, installs each mod
   it lists from the index with the checks below, writes `mod.<id>:true` for those with `on` (the default), and
-  copies `overrides/` into the game folder. `overrides/` may hold only what [mod-index.md](mod-index.md#hpack)
-  lists, within its size limits.
+  copies `overrides/` into the game folder.
 
 ## Before installing a file
 
-The checks `horizon_mods::index::check_file` makes, which [mod-index.md](mod-index.md#before-a-file-is-installed)
-specifies. A launcher that installs from the index makes the same ones:
+The checks `horizon_mods::index::check_file` makes. A launcher that installs
+from the index makes the same ones:
 
 1. **Where it comes from.** An `https://` address of the index's shape: a registry release
    (`https://github.com/horizon-rust/horizon-mods/releases/download/...`) or a release asset of the project's own
@@ -65,7 +61,7 @@ specifies. A launcher that installs from the index makes the same ones:
    version signed with another key is refused. With no key, say the project is unsigned.
 4. **Revoked.** A file in `revoked[]` (by `sha256`, or every version of an `id` without one) isn't installed. An
    installed copy is turned off (`mod.<id>:false`, or out of `resourcePacks`), and the player is told the reason.
-5. **What the file says.** Its manifest matches the entry (id, version, API), as mod-index.md lists for each kind.
+5. **What the file says.** Its manifest matches the entry (id, version, API) for each kind.
 
 ## Stability
 
