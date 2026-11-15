@@ -145,10 +145,9 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(by_code(payload["game"]["files"], "xx")["missing"], ["b"])
 
     def test_the_repository_folders_are_where_the_tool_looks(self):
-        code, out, _ = run("--lang", "es_es", "es", "--summary")
+        code, out, _ = run("--lang", "es_es", "--summary")
         self.assertEqual(code, 0, out)
         self.assertIn("GAME es_es ", out)
-        self.assertIn("LAUNCHER es ", out)
 
 
 if __name__ == "__main__":

@@ -254,7 +254,7 @@ class PortabilityTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == "win32", "the console's OEM code page is Windows'")
     def test_windows_version_reads_the_console_code_page(self):
-        # pr_ready runs the tests with PYTHONUTF8=1, and `cmd /C ver` answers in the OEM code page:
+        # The tests run with PYTHONUTF8=1, and `cmd /C ver` answers in the OEM code page:
         # decoding it as UTF-8 left `stdout` None (issue #5201).
         import os
         import subprocess

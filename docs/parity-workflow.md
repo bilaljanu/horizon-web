@@ -24,7 +24,7 @@ python3 tools/parity.py --hosts macmini,playhorizon   # with other machines (def
 python3 tools/parity.py --list       # what would run
 python3 tools/parity.py --status     # last result of each harness
 python3 tools/parity.py --changed origin/main      # those a branch's changes can affect (CI's parity job)
-python3 tools/parity.py --changed-files paths.txt  # the same for listed paths, in a copy without Git (tools/pr_ready.py)
+python3 tools/parity.py --changed-files paths.txt  # the same for listed paths, in a copy without Git
 ```
 
 Run `python3 tools/parity.py --changed origin/main` to select the harnesses a branch's changes can affect.

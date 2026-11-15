@@ -42,7 +42,7 @@ needed, the spec team records the observation (what was seen, with which pack an
    every point the documentation leaves open or contradicts. Each revision updates the revision line at the top,
    `provenance-log.md`, and a short changelog at the end of the spec.
 2. **Implementation.** The implementation team builds the feature in Horizon from the spec, in Rust on wgpu/naga,
-   following Horizon's usual rules (small PRs, harnesses, both single-player paths, `pr_ready.py`). Every PR body says
+   following Horizon's usual rules (small PRs, harnesses, both single-player paths). Every PR body says
    which spec revision it implements and links the decisions it relied on.
 3. **Open questions.** For each OQ of section 9 the implementer decides from first principles and from tests (packs
    run in Horizon, vanilla 26.3, the GL conventions in spec 5.5), and records the decision and the test in

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The vanilla data for this checkout on the self-hosted runner. Horizon never downloads the game: the runner
 # holds the maintainer's own copy, imported and decompiled once (HORIZON_SHARED_SOURCE, default
-# ~/code/horizon-parity/shared-local; tools/ci/linux-runner.sh sets it on Linux). It is cloned once into the runner's
+# ~/code/horizon-parity/shared-local). It is cloned once into the runner's
 # work folder ($RUNNER_WORKSPACE/shared-local; APFS clones, or reflinks where the file system has them, so no second
 # copy of the bytes), and .local/ links to it as in a parity worktree.
 # .local/horizon-client and the exporter outputs beside it, what horizon-prepare makes, are prepared by this
@@ -29,7 +29,7 @@ for entry in "$shared"/*; do
   if [ -L ".local/$name" ] || [ ! -e ".local/$name" ]; then ln -sfn "$entry" ".local/$name"; fi
 done
 
-# HORIZON_PREPARE_KEY: the same key, computed where the Git history is (tools/pr_ready.py on another machine).
+# HORIZON_PREPARE_KEY: the same key, computed where the Git history is (tools/prepare_output.py on another machine).
 sha256() { if command -v shasum > /dev/null; then shasum -a 256; else sha256sum; fi; }
 key=${HORIZON_PREPARE_KEY:-$(git ls-files -s crates/horizon-prepare mods/horizon/src/test/java research-lock.json | sha256 | cut -c1-16)}
 prepared="$shared/prepared/$key"

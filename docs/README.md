@@ -75,7 +75,5 @@ builds on. For building and installing the web app, start with the
 ## Other
 
 - [Forking](forking.md): building the engine without Horizon's own extras.
-- [Known issues](known-issues.md).
-- [Datapack upgrade](datapack-upgrade.md) and
-  [native block clone items](native-block-clone-item.md).
+- [Native block clone items](native-block-clone-item.md).
 - [Pregeneration](pregeneration.md).

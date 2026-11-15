@@ -1008,7 +1008,7 @@ def hardware():
 def windows_version():
     """"Microsoft Windows [Version 10.0.26200.8037]", as horizon_bench reports it (`ver`)."""
     # `cmd` answers in the console's OEM code page, not UTF-8: a reader thread that decodes the
-    # other way fails and leaves `stdout` None, which is what `pr_ready` (it sets PYTHONUTF8=1
+    # other way fails and leaves `stdout` None, which is what the test runner (it sets PYTHONUTF8=1
     # for the tests) used to get.
     out = subprocess.run(["cmd", "/C", "ver"], capture_output=True, text=True,
                          encoding="oem", errors="replace").stdout

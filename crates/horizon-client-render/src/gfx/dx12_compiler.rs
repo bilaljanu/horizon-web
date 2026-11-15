@@ -7,7 +7,7 @@
 //! about 9 % of GPU time at render distance 32 and lost 0.03 ms at 8. So
 //! discrete GPUs keep FXC (`d3dcompiler_47.dll`, part of Windows), and only
 //! integrated ones load DXC (`dxcompiler.dll`, which the Windows x64 zip puts
-//! beside the game: `tools/ci/fetch_dxc.py`).
+//! beside the game).
 //!
 //! wgpu chooses the compiler for a whole instance, before any adapter is
 //! known. `open_backend` therefore asks for the adapter on an FXC instance and,

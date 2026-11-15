@@ -34,4 +34,4 @@ actual_state_factory_lifecycle -- --ignored --nocapture`.
 Strict no-default-features Clippy passes all targets of `horizon-client`,
 `horizon-client-lib`, `horizon-mod-api-gen` and `horizon-mod-api-gen-tests`.
 The final tests and Clippy used an unchanged source snapshot. These focused
-checks do not claim a full `pr_ready` run, Java input comparison or UI parity.
+checks do not claim a full repository check, Java input comparison or UI parity.

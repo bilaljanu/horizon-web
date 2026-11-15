@@ -75,8 +75,8 @@ of interpolated frames.
 
 ## Validation
 
-- `pr_ready.py --base 89b58991bbc02eb79b6965fc4ca56357fe2297d9 --quick`: public tree,
-  formatting, workspace clippy, 196 Python tests and 635 client tests passed.
+- Repository checks: public tree, formatting, workspace clippy, 196 Python tests
+  and 635 client tests passed.
 - Native animation parity: 907 fixtures (63 resource animations), including
   258,996 tick states and 203 intentionally rejected inputs, match the pinned client.
 - Native mipmap parity: 1,319 cases / 7,914 output lines match exactly.
@@ -84,9 +84,8 @@ of interpolated frames.
   harness tolerance; maximum error `1.40395e-07`.
 
 The full game parity suite was not run. This checkout has no recorded harness
-index; `pr_ready --quick` lists that deferred selection, and the relevant native
-harnesses above were run explicitly. GPU interpolation pixels and end-to-end FPS
-remain outside this evaluation.
+index, so the relevant native harnesses above were run explicitly. GPU
+interpolation pixels and end-to-end FPS remain outside this evaluation.
 
 ## Measured outcome
 

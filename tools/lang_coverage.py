@@ -300,11 +300,12 @@ def main(argv: list[str] | None = None) -> int:
         result["game"] = {"reference": reference.code, "keys": len(reference.entries), "files": game}
     launcher: list[dict] = []
     if not args.game_only:
-        if not args.launcher_dir.is_dir():
+        if args.launcher_dir.is_dir():
+            launcher = launcher_rows(args.launcher_dir, codes)
+            result["launcher"] = {"files": launcher}
+        elif args.launcher_only:
             print(f"{args.launcher_dir}: no such folder", file=sys.stderr)
             return 2
-        launcher = launcher_rows(args.launcher_dir, codes)
-        result["launcher"] = {"files": launcher}
     if codes and not game and not launcher:
         print(f"no lang file is named {' or '.join(sorted(codes))}", file=sys.stderr)
         return 2

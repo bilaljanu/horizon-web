@@ -1595,7 +1595,7 @@ def main():
     parser.add_argument("--by-crate", action="store_true", help="with --changed: count every Rust source a probe "
                         "links, not only those it can reach (tools/parity_reach.py)")
     parser.add_argument("--changed-files", metavar="FILE", help="like --changed, for the changed paths listed in FILE, "
-                        "one per line: for a copy without Git history (tools/pr_ready.py on another machine)")
+                        "one per line: for a copy without Git history")
     args = parser.parse_args()
 
     found = harnesses()

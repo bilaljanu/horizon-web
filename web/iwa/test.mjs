@@ -24,7 +24,7 @@ test('bundle resolves startup and lazy packs without query strings and signs', a
         const get = p => bundle.getResponse(origin + p);
         assert.equal(get('pkg/horizon-client_bg.wasm').headers['content-type'], 'application/wasm');
         assert.equal(new TextDecoder().decode(get('fs/manifest.txt').body), 'worldgen/test.json\t2\t../worldgen.tar.gz\n');
-        const manifest = JSON.parse(new TextDecoder().decode(get('manifest.webmanifest').body));
+        const manifest = JSON.parse(new TextDecoder().decode(get('.well-known/manifest.webmanifest').body));
         assert.equal(manifest.version, '1.0.0');
         assert.equal(get(manifest.start_url.slice(1)).status, 200);
         assert.equal(get('icon.svg').status, 200);
