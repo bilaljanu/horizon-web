@@ -49,11 +49,11 @@ export function buildBundle(site, origin, version) {
     }).join('\n');
     entries.set('fs/manifest.txt', Buffer.from(manifest));
     entries.set('index.html', Buffer.from(entries.get('index.html').toString().replace('</head>',
-        '<link rel="manifest" href="/manifest.webmanifest">\n</head>')));
-    entries.set('manifest.webmanifest', Buffer.from(JSON.stringify({
-        id: '/', name: 'Horizon Web', short_name: 'Horizon', version,
+        '<link rel="manifest" href="/.well-known/manifest.webmanifest">\n</head>')));
+    entries.set('.well-known/manifest.webmanifest', Buffer.from(JSON.stringify({
+        id: '/', name: 'CMB', short_name: 'CMB', version,
         start_url: '/index.html', scope: '/', display: 'standalone',
-        background_color: '#000000', theme_color: '#182c38',
+        update_manifest_url: "https://github.com/bilaljanu/horizon-web/releases/latest/download/update.json", background_color: '#000000', theme_color: '#182c38',
         icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
     })));
     entries.set('icon.svg', readFileSync(resolve(here, 'icon.svg')));
