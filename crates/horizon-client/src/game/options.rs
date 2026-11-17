@@ -437,6 +437,7 @@ impl Game<'_> {
                     let _ = horizon_os::fs::create_dir_all(&dir);
                     super::packs::open_folder(&dir);
                 }
+                Event::ImportJar => self.pick_jar(),
                 Event::BrowseMods => {
                     let ui = &mut self.ui.options.mod_browser;
                     self.mods.jobs.browse(ui, Self::game_dir());

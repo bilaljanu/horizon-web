@@ -1155,6 +1155,7 @@ dependencies = [
  "horizon-friends",
  "horizon-hdr",
  "horizon-items",
+ "horizon-java",
  "horizon-mod-api-gen",
  "horizon-mods",
  "horizon-narrator",
@@ -1418,6 +1419,19 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "horizon-java"
+version = "0.1.0"
+dependencies = [
+ "horizon-mods",
+ "horizon-os",
+ "log",
+ "serde",
+ "serde_json",
+ "toml",
+ "zip",
 ]
 
 [[package]]

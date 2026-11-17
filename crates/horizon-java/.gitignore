@@ -1,0 +1,6 @@
+# Small reproducible javac fixtures needed by include_bytes! without a JDK.
+!tests/data/Test.class
+!tests/data/Mark.class
+!tests/data/t/Execution*.class
+!tests/data/fabric-probe.jar
+!tests/data/neoforge-probe.jar

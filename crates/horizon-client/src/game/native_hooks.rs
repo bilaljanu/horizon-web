@@ -2741,6 +2741,9 @@ impl Game<'_> {
         phase: ServerTickPhase,
     ) {
         mod_api::dispatch_server_tick(self, mod_api::mods(), context, phase);
+        if matches!(phase, ServerTickPhase::ServerTickEnd { world_running: true }) {
+            self.java_server_tick();
+        }
     }
     /// Before an authoritative server level's tick pass. `dimension` is its ID.
     pub(super) fn native_level_tick_pre(&mut self, dimension: &str) {

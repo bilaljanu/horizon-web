@@ -439,8 +439,41 @@ impl Loading {
         self.drive_menu_mod_browser();
         self.restart_menu_resources()
     }
+    /// The startup menu's Import .jar button. Native builds use drag-and-drop.
+    fn menu_pick_jar(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        {
+            horizon_os::web::pick_file("jar", ".jar,application/java-archive");
+            self.menu.options.mods_note = Some(horizon_client::lang::tr("horizon.mods.import.hint", &[]));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.menu.options.mods_note = Some(horizon_client::lang::tr("horizon.mods.import.native", &[]));
+        }
+    }
+    /// Takes a jar the browser's chooser finished and installs it.
+    fn menu_poll_jar_import(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        let picked = horizon_os::web::take_picked_named("jar");
+        #[cfg(not(target_arch = "wasm32"))]
+        let picked: Option<(String, Vec<u8>)> = None;
+        let Some((name, bytes)) = picked else {
+            return;
+        };
+        let installed = super::mods::import_jar_bytes(
+            &Game::game_dir(),
+            &name,
+            &bytes,
+            &mut self.settings.mods.enabled,
+            &mut self.menu.options.mods_note,
+        );
+        if installed {
+            let _ = self.settings.save(&Game::options_path());
+        }
+    }
     /// The startup menu's Browse mods, as `Game::drive_mod_browser`.
     fn drive_menu_mod_browser(&mut self) {
+        self.menu_poll_jar_import();
         let menu = &mut self.menu;
         if menu
             .mod_jobs
@@ -595,6 +628,7 @@ impl Loading {
                     let _ = horizon_os::fs::create_dir_all(&dir);
                     packs::open_folder(&dir);
                 }
+                Event::ImportJar => self.menu_pick_jar(),
                 Event::BrowseMods => {
                     let ui = &mut self.menu.options.mod_browser;
                     self.menu.mod_jobs.browse(ui, Game::game_dir());
@@ -1050,7 +1084,25 @@ impl Loading {
             // `PackSelectionScreen.onFilesDrop`: a pack dropped on the window
             // joins the Create New World screen's data packs.
             WindowEvent::DroppedFile(path) => {
-                if let Some(title) = &mut self.menu.title {
+                if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("jar"))
+                    && self.menu.options_open
+                    && self.menu.options.page() == Page::Mods
+                {
+                    // A .jar dropped on the Mods page installs a Java mod.
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if let Ok(bytes) = horizon_os::fs::read(&path) {
+                        let name = path.file_name().unwrap_or_default().to_string_lossy();
+                        if super::mods::import_jar_bytes(
+                            &Game::game_dir(),
+                            &name,
+                            &bytes,
+                            &mut self.settings.mods.enabled,
+                            &mut self.menu.options.mods_note,
+                        ) {
+                            let _ = self.settings.save(&Game::options_path());
+                        }
+                    }
+                } else if let Some(title) = &mut self.menu.title {
                     title.drop_file(path);
                 }
             }

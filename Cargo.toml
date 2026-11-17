@@ -29,6 +29,7 @@ members = [
     "crates/horizon-bench",
     "crates/horizon-friends",
     "crates/horizon-mods",
+    "crates/horizon-java",
     "crates/horizon-mod-api-gen",
     "crates/horizon-shaders",
     "crates/horizon-optifine",

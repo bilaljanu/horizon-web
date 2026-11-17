@@ -1,0 +1,7 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT"
+[[mods]]
+modId="neoprobe"
+version="1.0.0"
+displayName="NeoForge entrypoint probe"

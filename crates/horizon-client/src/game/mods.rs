@@ -9,6 +9,7 @@ use horizon_client::{
 };
 use horizon_os::fs::PathExt;
 use std::path::PathBuf;
+mod java;
 
 #[derive(Default)]
 pub(super) struct ModsState {
@@ -160,6 +161,31 @@ pub(super) fn content_root(
             Err(e) => log::warn!("Horizon: mod {} content not loaded: {e}", m.id),
         }
     }
+    // Java code registers into the same content tables and resource root used
+    // by the client and integrated server, before either loads world data.
+    let mut jars: Vec<PathBuf> = horizon_os::fs::read_dir(here.join(mod_list::DIR))
+        .map(|d| d.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("jar"))).collect())
+        .unwrap_or_default();
+    jars.sort();
+    java::deactivate();
+    for path in jars {
+        let id = horizon_os::fs::read(&path).ok()
+            .and_then(|b| horizon_java::jar::Jar::open(b).ok())
+            .and_then(|mut jar| horizon_java::metadata::detect(&mut jar).ok())
+            .map(|m| m.metadata.id);
+        if !id.as_ref().is_some_and(|id| enabled.contains(id)) { continue; }
+        let result = (|| -> Result<(), String> {
+            let (manifest, content) = java::load(&path, &here.join(".horizon-cache"))?;
+            if known.is_none() { known = Some(mod_content::known_components(root).map_err(|e| e.to_string())?); }
+            let source = content.source().to_owned();
+            let candidate = ContentMod { id: manifest.id.clone(), content };
+            mod_content::accept_mod(&mut mods, candidate, known.as_ref().unwrap()).map_err(|e| e.to_string())?;
+            java::activate(&manifest.id, &source);
+            if announce { announced.push(announced_entry(&manifest, &path)); }
+            Ok(())
+        })();
+        if let Err(error) = result { log::warn!("Horizon: Java mod {} not loaded: {error}", path.display()); }
+    }
     let (blocks, items) = native_declared();
     if !blocks.is_empty() || !items.is_empty() {
         if known.is_none() {
@@ -202,6 +228,7 @@ pub(super) fn content_root(
         }
         Err(e) => {
             log::warn!("Horizon: content mods not loaded: {e}");
+            java::deactivate();
             register_mob_effects(&[]);
             register_entity_types(&[]);
             register_menu_types(&[]);
@@ -468,12 +495,171 @@ fn not_built(dir: &std::path::Path, built: &str, rows: &[Installed]) -> Vec<Inst
     out
 }
 
+/// Inspect Java jars without executing code during a Mods-page refresh.
+fn java_rows(dir: &std::path::Path) -> Vec<Installed> {
+    let mut paths: Vec<PathBuf> = horizon_os::fs::read_dir(dir)
+        .map(|d| d.flatten().map(|e| e.path()).collect())
+        .unwrap_or_default();
+    paths.retain(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("jar")));
+    paths.sort();
+    paths.into_iter().map(|path| {
+        let result = horizon_os::fs::read(&path).map_err(|e| e.to_string())
+            .and_then(horizon_java::jar::Jar::open)
+            .and_then(|mut jar| horizon_java::compat::inspect(&mut jar, &Default::default(), &Default::default()));
+        match result {
+            Ok(report) => {
+                let details = report.diagnostics.iter().map(|d| d.message.as_str()).collect::<Vec<_>>().join("; ");
+                Installed {
+                    title: format!("{} {} ({})", report.metadata.name, report.metadata.version, report.metadata.loader.name()),
+                    id: report.metadata.id,
+                    description: report.metadata.description,
+                    problem: Some(format!("Java mod: registers content when the world loads. Compatibility unverified. {details}")),
+                    dev: false,
+                    native: None,
+                }
+            }
+            Err(error) => Installed {
+                id: String::new(),
+                title: path.file_name().unwrap_or_default().to_string_lossy().into_owned(),
+                description: String::new(),
+                problem: Some(format!("Can't read Java mod: {error}")),
+                dev: false,
+                native: None,
+            },
+        }
+    }).collect()
+}
+
+/// Validate and store a local Java archive in the mods folder. Returns its mod
+/// id. No code runs here: execution happens at the next content-root build,
+/// once the mod is enabled. The file name is reduced to its last component so
+/// a browser-provided path cannot escape the folder.
+pub(super) fn install_jar(
+    dir: &std::path::Path,
+    file_name: &str,
+    bytes: &[u8],
+) -> Result<String, String> {
+    const LIMIT: u64 = horizon_java::jar::MAX_JAR;
+    if bytes.len() as u64 > LIMIT {
+        return Err(format!("Java archive exceeds the {LIMIT} byte size limit"));
+    }
+    let clean = std::path::Path::new(file_name)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|n| !n.is_empty() && *n != "." && *n != "..")
+        .ok_or("Invalid file name")?;
+    let name = if clean.to_ascii_lowercase().ends_with(".jar") {
+        clean.to_owned()
+    } else {
+        format!("{clean}.jar")
+    };
+    let mut jar = horizon_java::jar::Jar::open(bytes.to_vec())
+        .map_err(|e| format!("Can't read Java mod: {e}"))?;
+    let report = horizon_java::compat::inspect(&mut jar, &Default::default(), &Default::default())
+        .map_err(|e| format!("Can't inspect Java mod: {e}"))?;
+    if report.metadata.id.is_empty() {
+        return Err("Java mod has no id".into());
+    }
+    let target = dir.join(mod_list::DIR).join(name);
+    if let Some(parent) = target.parent() {
+        horizon_os::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    horizon_os::fs::write(&target, bytes).map_err(|e| e.to_string())?;
+    Ok(report.metadata.id)
+}
+
+/// Shared tail of a jar import: store the archive, enable its id and describe
+/// the outcome on the Mods page. Returns whether a mod was installed.
+pub(super) fn import_jar_bytes(
+    dir: &std::path::Path,
+    name: &str,
+    bytes: &[u8],
+    enabled: &mut std::collections::BTreeSet<String>,
+    note: &mut Option<String>,
+) -> bool {
+    let id = match install_jar(dir, name, bytes) {
+        Ok(id) => id,
+        Err(error) => {
+            log::warn!("Horizon: Java mod import failed: {error}");
+            *note = Some(lang::tr("horizon.mods.import.failed", &[&error]));
+            return false;
+        }
+    };
+    enabled.insert(id.clone());
+    *note = Some(lang::tr("horizon.mods.import.done", &[&id]));
+    true
+}
+
 /// A WebAssembly code mod's row on the Mods page.
 const STOPPED: &str = "Doesn't run any more: needs a native port";
 /// The player was told once about the WebAssembly mods that stopped (`horizon-mods/<this>`).
 const NOTICE_SEEN: &str = ".native-notice";
 
 impl Game<'_> {
+    pub(super) fn java_server_tick(&mut self) {
+        java::server_tick();
+    }
+    /// The in-game Import .jar button. Native builds use drag-and-drop on the
+    /// window instead; only the browser has an async file chooser.
+    pub(super) fn pick_jar(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        {
+            horizon_os::web::pick_file("jar", ".jar,application/java-archive");
+            self.ui.options.mods_note = Some(lang::tr("horizon.mods.import.hint", &[]));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.ui.options.mods_note = Some(lang::tr("horizon.mods.import.native", &[]));
+        }
+    }
+    /// Called every frame: takes a jar the browser's file chooser finished and
+    /// installs it. Returns true when a picked file was handled (installed or
+    /// rejected), so the Mods note changed either way.
+    pub(super) fn poll_jar_import(&mut self) -> bool {
+        #[cfg(target_arch = "wasm32")]
+        let picked = horizon_os::web::take_picked_named("jar");
+        #[cfg(not(target_arch = "wasm32"))]
+        let picked: Option<(String, Vec<u8>)> = None;
+        let Some((name, bytes)) = picked else {
+            return false;
+        };
+        let installed = import_jar_bytes(
+            &Self::game_dir(),
+            &name,
+            &bytes,
+            &mut self.settings.mods.enabled,
+            &mut self.ui.options.mods_note,
+        );
+        if installed {
+            self.start_mods();
+            self.switch_mods();
+            let _ = self.settings.save(&Self::options_path());
+        }
+        true
+    }
+    /// Native drag-and-drop of a `.jar` onto the window.
+    pub(super) fn drop_jar(&mut self, path: &std::path::Path) -> bool {
+        if !path.extension().is_some_and(|e| e.eq_ignore_ascii_case("jar")) {
+            return false;
+        }
+        let Ok(bytes) = horizon_os::fs::read(path) else {
+            return false;
+        };
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        let installed = import_jar_bytes(
+            &Self::game_dir(),
+            &name,
+            &bytes,
+            &mut self.settings.mods.enabled,
+            &mut self.ui.options.mods_note,
+        );
+        if installed {
+            self.start_mods();
+            self.switch_mods();
+            let _ = self.settings.save(&Self::options_path());
+        }
+        true
+    }
     /// Lists the installed mods on the Mods page. Content mods load with the resources
     /// (`content_root`); native ones are built into the game (`native_hooks.rs`). WebAssembly code
     /// mods don't run any more: their rows say so, and the player hears it once in the chat
@@ -515,6 +701,7 @@ impl Game<'_> {
                 }
             })
             .collect();
+        self.settings.mods.installed.extend(java_rows(&dir));
         (self.mods.content_ids, self.mods.live_ids) = (content_ids, live_ids);
         self.ui.options.mods_live = self.mods_live_now();
         if self.mods.applied.is_none() {
@@ -976,6 +1163,59 @@ mod tests {
         // A release has no file; a build without mods has an empty list.
         assert_eq!(native_mods_detail(""), None);
         assert_eq!(native_mods_detail(r#"{"mods":[]}"#), None);
+    }
+
+    #[test]
+    fn java_mod_rows_are_explicitly_unverified() {
+        let dir = std::env::temp_dir().join(format!("horizon-java-rows-{}", std::process::id()));
+        horizon_os::fs::create_dir_all(&dir).unwrap();
+        horizon_os::fs::write(
+            dir.join("probe.jar"),
+            include_bytes!("../../../horizon-java/tests/data/fabric-probe.jar"),
+        )
+        .unwrap();
+        horizon_os::fs::write(dir.join("broken.jar"), b"not a jar").unwrap();
+        let rows = java_rows(&dir);
+        assert_eq!(rows.len(), 2);
+        assert!(
+            rows[0]
+                .problem
+                .as_ref()
+                .unwrap()
+                .contains("Can't read Java mod")
+        );
+        assert_eq!(rows[1].id, "fabricprobe");
+        assert!(rows[1].title.contains("Fabric"));
+        assert!(
+            rows[1]
+                .problem
+                .as_ref()
+                .unwrap()
+                .contains("Java mod: registers content when the world loads")
+        );
+        assert!(rows[1].problem.as_ref().unwrap().contains("unverified"));
+        horizon_os::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn local_jar_import_validates_stores_and_enables() {
+        let dir = std::env::temp_dir().join(format!("horizon-jar-import-{}", std::process::id()));
+        let _ = horizon_os::fs::remove_dir_all(&dir);
+        let bytes = include_bytes!("../../../horizon-java/tests/data/fabric-probe.jar");
+        // The browser supplies a full path and sometimes a missing extension.
+        let id = install_jar(&dir, "../../evil/../fixture.jar", bytes).unwrap();
+        assert_eq!(id, "fabricprobe");
+        let stored = dir.join(mod_list::DIR).join("fixture.jar");
+        assert_eq!(horizon_os::fs::read(&stored).unwrap(), bytes);
+        assert!(horizon_os::fs::metadata(dir.join(mod_list::DIR).join("evil")).is_err());
+        // No extension: appended. A broken archive: rejected, nothing written.
+        assert_eq!(install_jar(&dir, "second", bytes).unwrap(), "fabricprobe");
+        assert!(dir.join(mod_list::DIR).join("second.jar").exists());
+        assert!(install_jar(&dir, "bad.jar", b"not a jar").is_err());
+        assert!(install_jar(&dir, "../escape.jar", bytes).is_ok());
+        assert!(dir.join(mod_list::DIR).join("escape.jar").exists());
+        assert!(install_jar(&dir, "..", bytes).is_err());
+        horizon_os::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

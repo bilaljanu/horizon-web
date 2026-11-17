@@ -1390,6 +1390,8 @@ enum Act {
     NativeKey(usize, usize),
     NativeButton(usize, usize),
     OpenModFolder,
+    /// Import a local `.jar` from the file chooser (or drop it on the window).
+    ImportJar,
     /// Browse mods: the page of listing `.0` of `mod_browser`.
     ModProject(usize),
     /// The open project page's Install or Update.
@@ -1518,6 +1520,9 @@ pub enum Event {
     /// Data Packs' Open Pack Folder: create the folder if needed and open it.
     OpenDataPackFolder(std::path::PathBuf),
     OpenModFolder,
+    /// Open the local file chooser for a Java `.jar` (browser only; native uses
+    /// drag-and-drop) and install it into the mods folder.
+    ImportJar,
     /// Browse mods opened: read the registry's index into `mod_browser`.
     BrowseMods,
     /// Install (or update) the registry's content mod with this id.
@@ -2976,11 +2981,18 @@ impl OptionsUi {
                 let browse = button(
                     0.0,
                     0.0,
-                    310.0,
+                    150.0,
                     tr("horizon.mods.browse"),
                     Act::Push(Page::ModBrowser),
                 );
-                let mut rows = vec![Row::Buttons(browse, None)];
+                let import = button(
+                    0.0,
+                    0.0,
+                    150.0,
+                    tr("horizon.mods.import_jar"),
+                    Act::ImportJar,
+                );
+                let mut rows = vec![Row::Buttons(browse, Some(import))];
                 if let Some(note) = &self.mods_note {
                     rows.extend(wrap(note, 64).into_iter().map(Row::Note));
                 }
@@ -4307,6 +4319,7 @@ impl OptionsUi {
                         }
                         Act::NativeButton(i, b) => events.push(Event::NativeButton(i, b)),
                         Act::OpenModFolder => events.push(Event::OpenModFolder),
+                        Act::ImportJar => events.push(Event::ImportJar),
                         Act::ModProject(i) => {
                             if let Some(listing) = self.mod_browser.listings.get(i) {
                                 self.mod_project = listing.id.clone();
@@ -5228,6 +5241,7 @@ impl OptionsUi {
                         }
                         Act::NativeButton(i, b) => events.push(Event::NativeButton(i, b)),
                         Act::OpenModFolder => events.push(Event::OpenModFolder),
+                        Act::ImportJar => events.push(Event::ImportJar),
                         Act::ModProject(i) => {
                             if let Some(listing) = self.mod_browser.listings.get(i) {
                                 self.mod_project = listing.id.clone();
@@ -5876,6 +5890,35 @@ mod tests {
         assert!(!s.mods.is_on(0));
         assert!(!ui.back(&mut s).contains(&Event::Close));
         assert_eq!(ui.page(), Page::Main);
+    }
+
+    #[test]
+    fn mods_page_import_button_asks_the_game_to_pick_a_jar() {
+        let atlas = atlas();
+        let mut s = Settings::default();
+        let mut ui = OptionsUi::default();
+        let size = (480.0, 240.0);
+        ui.show(Page::Mods);
+        let widgets = ui.layout(&s, size.0, size.1).0;
+        let import = widgets
+            .iter()
+            .find(|w| matches!(w.kind, WKind::Button { act: Act::ImportJar, .. }))
+            .expect("Mods page has an Import .jar button");
+        assert_eq!(
+            ui.click(
+                &mut s,
+                &atlas,
+                import.x + 1.0,
+                import.y + 1.0,
+                size,
+                [480, 240],
+                false,
+                false,
+            ),
+            vec![Event::ButtonClick, Event::ImportJar]
+        );
+        let en = crate::lang::Language::load(&[], "en_us");
+        assert_eq!(en.get("horizon.mods.import_jar").as_deref(), Some("Import .jar..."));
     }
 
     #[test]

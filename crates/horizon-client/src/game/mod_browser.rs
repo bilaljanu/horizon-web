@@ -149,6 +149,7 @@ fn spawn(name: &str, work: impl FnOnce() + Send + 'static) {
 impl Game<'_> {
     /// Each frame: what the browser's worker finished.
     pub(super) fn drive_mod_browser(&mut self) {
+        self.poll_jar_import();
         let installed = self
             .mods
             .jobs

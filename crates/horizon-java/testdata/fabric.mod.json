@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"fabricprobe","version":"1.0.0","entrypoints":{"main":["fixture.FabricProbe"]},"depends":{"minecraft":"26.3","java":">=21"}}

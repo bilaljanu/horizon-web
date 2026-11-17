@@ -15599,6 +15599,14 @@ impl Game<'_> {
         {
             title.drop_file(path.clone());
         }
+        // Import a local Java mod by dropping its .jar on the Mods page.
+        if let WindowEvent::DroppedFile(path) = &event
+            && path.extension().is_some_and(|e| e.eq_ignore_ascii_case("jar"))
+            && self.screen == Screen::Options
+            && self.ui.options.page() == horizon_client::options_ui::Page::Mods
+        {
+            self.drop_jar(path);
+        }
         // GLFW never hands a field the keys an input method consumes: while a
         // composition is open, and the Enter or Escape that ends it (winit on
         // Windows still sends that one right after `Ime::Commit`).

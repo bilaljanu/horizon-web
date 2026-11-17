@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Horizon Java runtime regression probe</title>
+<pre id="result">Running in a worker…</pre>
+<script type="module">
+const worker = new Worker('./probe-worker.js', {type: 'module'});
+worker.onmessage = event => {
+  document.getElementById('result').textContent = JSON.stringify(event.data);
+  worker.terminate();
+};
+worker.onerror = event => { document.getElementById('result').textContent = event.message; };
+</script>

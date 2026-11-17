@@ -583,7 +583,7 @@ enum Source {
 }
 
 /// A mod's content: its files and declarations.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Content {
     source: Source,
     /// Every content file (`assets/...`, `data/...`), sorted.
